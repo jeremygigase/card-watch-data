@@ -1,0 +1,53 @@
+name: Daily prices
+
+on:
+  schedule:
+    # Cardmarket refreshes its price guide around 03:00 Belgian time. Cron is in UTC.
+    # The second run catches a late refresh; when nothing changed it does nothing.
+    - cron: '30 1 * * *'
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Process even if the price guide did not change'
+        type: boolean
+        default: false
+
+concurrency:
+  group: card-watch-data          # never run at the same time as the mapping job
+  cancel-in-progress: false
+
+permissions:
+  contents: write                 # commit the data and upload the daily archive
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download and store today's prices
+        run: node scripts/update-prices.mjs ${{ inputs.force && '--force' || '' }}
+
+      - name: Archive the original price guide in a monthly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(archive/*.json.gz)
+          [ ${#files[@]} -eq 0 ] && exit 0
+          tag="archive-$(date -u +%Y-%m)"
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --title "Price guide archive $(date -u +%Y-%m)" \
+              --notes "Cardmarket's original daily Pokémon price guide files, gzipped. One file per day."
+          gh release upload "$tag" "${files[@]}" --clobber
+
+      - name: Save the data (one commit, so the repository stays small)
+        run: bash scripts/commit-data.sh "Prices of $(node -p "require('./manifest.json').lastDay")"
