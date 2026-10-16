@@ -1,0 +1,59 @@
+{
+  "_source": "Rows copied from catalog/products.json (snapshot 2026-10-14), plus one SYNTHETIC control row (999001).",
+  "fields": [
+    "idProduct",
+    "name",
+    "idExpansion",
+    "idCategory",
+    "categoryName",
+    "idMetacard",
+    "dateAdded"
+  ],
+  "rows": [
+    [
+      274057,
+      "Dark Charizard [Nail Flick | Continuous Fireball]",
+      1528,
+      51,
+      "Pokémon Single",
+      211935,
+      "0000-00-00 00:00:00"
+    ],
+    [
+      274058,
+      "Dark Dragonite [Summon Minions | Giant Tail]",
+      1528,
+      51,
+      "Pokémon Single",
+      211936,
+      "0000-00-00 00:00:00"
+    ],
+    [
+      274074,
+      "Dark Charizard [Nail Flick | Continuous Fireball]",
+      1528,
+      51,
+      "Pokémon Single",
+      211935,
+      "0000-00-00 00:00:00"
+    ],
+    [
+      274075,
+      "Dark Dragonite [Summon Minions | Giant Tail]",
+      1528,
+      51,
+      "Pokémon Single",
+      211936,
+      "0000-00-00 00:00:00"
+    ],
+    [
+      999001,
+      "Test Control [Move A | Move B]",
+      9999,
+      51,
+      "Pokémon Single",
+      999001,
+      "2026-01-01 00:00:00"
+    ]
+  ]
+}

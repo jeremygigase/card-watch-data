@@ -1,0 +1,9 @@
+[
+  {
+    "cardId": "base5-22",
+    "variant": "normal",
+    "from": 274058,
+    "to": 274075,
+    "source": "card-watch-site/src/lib/cmverify.ts PRODUCT_OVERRIDES; not backed by any data source"
+  }
+]

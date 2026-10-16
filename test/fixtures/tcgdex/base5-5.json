@@ -1,0 +1,21 @@
+{
+  "_source": "Trimmed from api.tcgdex.net/v2/en/cards/base5-5 on 2026-10-16",
+  "id": "base5-5",
+  "localId": "5",
+  "name": "Dark Dragonite",
+  "rarity": "Rare",
+  "set": {
+    "id": "base5",
+    "name": "Team Rocket",
+    "cardCount": { "official": 82, "total": 83 }
+  },
+  "variants": {
+    "firstEdition": true,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "abilities": [{ "type": "Pokemon Power", "name": "Summon Minions" }],
+  "attacks": [{ "name": "Giant Tail" }]
+}

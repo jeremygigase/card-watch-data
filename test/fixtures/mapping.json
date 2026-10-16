@@ -1,0 +1,10 @@
+{
+  "_source": "Entries copied from mapping/cards.json (version 2026-10-14T16:20:46.858Z); ctl-1 is SYNTHETIC.",
+  "fields": ["idProduct", "file"],
+  "cards": {
+    "base5-5": [274058, "e1528"],
+    "base5-22": [274058, "e1528"],
+    "ctl-1": [999001, "e9999"]
+  },
+  "variants": {}
+}

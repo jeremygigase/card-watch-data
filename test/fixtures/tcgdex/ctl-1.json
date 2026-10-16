@@ -1,0 +1,20 @@
+{
+  "_source": "SYNTHETIC control: one card, one product, nothing else shares its name. Not real data.",
+  "id": "ctl-1",
+  "localId": "1",
+  "name": "Test Control",
+  "set": {
+    "id": "ctl",
+    "name": "Control Set",
+    "cardCount": { "official": 10, "total": 10 }
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": true,
+    "reverse": false,
+    "wPromo": false
+  },
+  "abilities": [],
+  "attacks": [{ "name": "Move A" }, { "name": "Move B" }]
+}
