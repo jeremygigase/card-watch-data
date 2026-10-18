@@ -5,7 +5,7 @@ import { ROOT, readJson, writeJson, bucketOf } from './lib.mjs'
 const MAPPING = path.join(ROOT, 'mapping', 'cards.json')
 
 /* Find the end of the bracket that opens at text[start] ('[' or '{'), skipping strings. */
-function matchBracket(text, start) {
+export function matchBracket(text, start) {
   const open = text[start], close = open === '[' ? ']' : '}'
   let depth = 0, quote = null
   for (let i = start; i < text.length; i++) {
@@ -51,7 +51,9 @@ export function parseCardFile(text) {
       if (id) {
         const type = (/type\s*:\s*["']([^"']+)["']/.exec(obj) || [])[1] || 'normal'
         const stamps = [...(((/stamp\s*:\s*\[([^\]]*)\]/.exec(obj) || [])[1] || '').matchAll(/["']([^"']+)["']/g))].map(s => s[1])
-        variants.push({ type, stamps, id: Number(id[1]) })
+        const size = (/\bsize\s*:\s*["']([^"']+)["']/.exec(obj) || [])[1] || null        // "jumbo"
+        const subtype = (/\bsubtype\s*:\s*["']([^"']+)["']/.exec(obj) || [])[1] || null  // "shadowless"
+        variants.push({ type, subtype, stamps, size, id: Number(id[1]) })
       }
       i = end
     }
@@ -62,7 +64,7 @@ export function parseCardFile(text) {
 /* The product the app follows for a card: the card-level id, else the plain (unstamped) variant. */
 export function primaryProduct({ cardLevel, variants }) {
   if (cardLevel != null) return cardLevel
-  const plain = variants.filter(v => !v.stamps.length)
+  const plain = variants.filter(v => !v.stamps.length && !v.size)
   for (const t of ['normal', 'holo', 'reverse']) {
     const v = plain.find(x => x.type === t)
     if (v) return v.id

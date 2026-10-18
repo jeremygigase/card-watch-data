@@ -2,3 +2,7 @@
 archive/
 node_modules/
 .DS_Store
+
+# Local mapping run: TCGdex download and the review page
+.cache/
+mapping-report.html

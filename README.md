@@ -5,7 +5,8 @@ Your own daily copy of Cardmarket's Pokémon price guide, with history, for the 
 Every night a GitHub Action downloads Cardmarket's public price guide and product catalogue
 (one download each, all ~80,000 Pokémon products, singles and sealed), stores today's prices,
 and adds the day to the price history. Once a week it links TCGdex card codes (`neo1-6`) to
-Cardmarket products (`274406`) using TCGdex's open card database. GitHub Pages serves the files,
+Cardmarket products (`274406`), using the order of Cardmarket's own catalogue and TCGdex's open card database
+(see "The card mapping" below). GitHub Pages serves the files,
 so the app (and anyone you give the address to) reads prices from here instead of calling an API per card.
 
 History starts on the day you set this up; Cardmarket doesn't offer older days.
@@ -17,7 +18,8 @@ manifest.json                 what's stored: recorded days, last update, field n
 latest/e<expansion>.json      today's prices, one file per Cardmarket expansion (set)
 history/<YYYY-MM>/e<exp>.json trend prices per product, only on days they changed
 catalog/products.json         every Pokémon product: id, name, expansion, category
-mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name]
+mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name, metacard id, how it was found]
+mapping/overrides.json        your own fixes to the mapping (card code -> product id, or null)
 scripts/                      the jobs (Node 20, no dependencies)
 .github/workflows/            daily prices, weekly mapping
 ```
@@ -31,7 +33,8 @@ so you can rebuild or extend the history later (for example with fields this rep
 - `history/2026-10/e1531.json` → `{"fields": ["trend", "trend-holo"], "p": {"274406": [["2026-10-12", 36.64, 14.01], ["2026-10-14", 39.1, 14.01]]}}`
   A point means "from this day on, until the next point". Use `manifest.days` for the days that were recorded.
   A point with only `null`s means the product left the price guide.
-- `mapping/cards.json` → `"cards": {"neo1-6": [274406, "e1531"]}`. The second value is the file name to open in `latest/` and `history/`.
+- `mapping/cards.json` → `"cards": {"base5-22": [274075, "e1528", 211936, "order"]}`. The second value is the file name to open in `latest/` and `history/`;
+  the third is Cardmarket's metacard id (the same for every printing of a card); the last says how the link was found (see below).
 - Products without an expansion are in `x0` … `x49` (by product id modulo 50).
 
 ## Set it up (about 10 minutes)
@@ -64,11 +67,41 @@ Using it for yourself is one thing; before you open this up to other people or u
 check Cardmarket's terms or ask them. Keeping this repository private is not possible with free GitHub Pages,
 so the files are publicly readable.
 
+## The card mapping
+
+TCGdex's card files carry a Cardmarket product id, but for older sets it often gives two printings of
+the same card the same id (the holo #5 and the non-holo #22 Dark Dragonite in Team Rocket both get 274058).
+Cardmarket has a separate product for each. Within an expansion Cardmarket created its products in
+card-number order, so `scripts/build-mapping.mjs` lines up each TCGdex set (by card number) with its expansion's
+products (by product id), pairing only cards and products whose name and attacks fit. The last value of each
+entry says how a card was linked:
+
+- `order`: by that line-up (almost all cards)
+- `name`: the only left-over product that fits the card
+- `tcgdex`: TCGdex's own link, for cards the catalogue can't place
+- `override`: your own choice from `mapping/overrides.json`
+
+Run it on your computer (Node 20+ and git; the first run downloads TCGdex's card data into `.cache/`):
+
+```
+npm run mapping
+```
+
+Then open `mapping-report.html` (not committed). Per set it shows the links that differ from TCGdex,
+cards without a product, products no card got, and **cards where two products fit** with both prices,
+so you can decide. To change a link, add it to `mapping/overrides.json` and run again:
+
+```json
+{ "sm1-24": 294121, "base1-58": null }
+```
+
+A number links that product; `null` removes the link (the app then uses TCGdex's price for that card).
+Commit `mapping/cards.json`, `mapping/overrides.json` and `manifest.json`. The weekly job runs the same
+script with the same overrides, so it keeps your choices.
+
 ## Run it on your own computer
 
 ```
 node scripts/update-prices.mjs --force
-git clone --depth 1 --filter=blob:none --sparse https://github.com/tcgdex/cards-database /tmp/tcgdex
-git -C /tmp/tcgdex sparse-checkout set data
-node scripts/build-mapping.mjs /tmp/tcgdex
+npm run mapping
 ```

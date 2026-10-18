@@ -40,13 +40,18 @@
     "trend-holo"
   ],
   "updatedAt": "2026-10-18T06:06:27.835Z",
-  "mappingVersion": "2026-10-18T06:06:27.826Z",
+  "mappingVersion": "2026-10-18T22:35:12.694Z",
   "mapping": {
     "sets": 219,
     "cards": 23873,
-    "mapped": 20457,
-    "unknownToCatalogue": 1,
+    "mapped": 20796,
+    "byOrder": 19393,
+    "byName": 876,
+    "byTcgdex": 527,
+    "byOverride": 0,
+    "changedFromTcgdex": 1327,
+    "unknownToCatalogue": 0,
     "noSetId": 0,
-    "updatedAt": "2026-10-14T16:20:46.858Z"
+    "updatedAt": "2026-10-18T22:35:12.694Z"
   }
 }

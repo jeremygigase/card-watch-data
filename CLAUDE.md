@@ -112,7 +112,9 @@ Rules worth knowing:
 scripts/lib.mjs            shared helpers; URLs (override base with env CM_BASE for testing); bucketOf()
 scripts/update-prices.mjs  nightly job (flag --force ignores the ETag check)
 scripts/mapping-lib.mjs    parses TCGdex card .ts files; rebucketMapping()
-scripts/build-mapping.mjs  weekly job: node scripts/build-mapping.mjs <tcgdex cards-database checkout>
+scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalogue order + name/attacks
+scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
+                           without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
 scripts/commit-data.sh     commits everything as ONE orphan commit + force push (keeps the repo small)
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM
 .github/workflows/mapping.yml  Mondays 03:00 UTC; sparse-clones tcgdex/cards-database data/
@@ -128,7 +130,9 @@ Both workflows share the concurrency group `card-watch-data`, so they never run 
   - A point holds from its day until the next point.
   - Each month starts with a full point, so a month file can be read on its own.
   - A point that is all `null` means the product left the price guide.
-- **`mapping/cards.json`:** `{version, catalogVersion, cards: {"neo1-6": [274406, "e1531"]}, variants: {cardId: {"holo+1st-edition": id}}, sets: {"neo1": 1531}}`
+- **`mapping/cards.json`:** `{version, catalogVersion, fields: [idProduct, file, idMetacard, how], cards: {"base5-22": [274075, "e1528", 211936, "order"]}, variants: {cardId: {"holo+1st-edition": id}}, sets: {"neo1": 1531}}`
+  - `how`: `order` (lined up with the expansion's products by card number vs product id, name + attacks must fit), `name` (only fitting left-over product), `tcgdex` (TCGdex's own link), `override` (from `mapping/overrides.json`).
+  - Why: TCGdex gives holo and non-holo printings of old cards the same Cardmarket id; Cardmarket has one product per printing, created in card-number order.
 - **`catalog/products.json`:** `{fields: [idProduct, name, idExpansion, idCategory, categoryName, idMetacard, dateAdded], rows}`
 - **File names** ("buckets"): `e<idExpansion>`, or `x<idProduct % 50>` for products without an expansion.
 - **Day labels:** a guide's day is the Belgian date of its `createdAt` (e.g. `2026-10-14T02:53:25+0200` → `2026-10-14`).
@@ -188,9 +192,7 @@ Run the data jobs locally (Node 20+):
 ```
 cd card-watch-data
 node scripts/update-prices.mjs --force                 # needs access to downloads.s3.cardmarket.com
-git clone --depth 1 --filter=blob:none --sparse https://github.com/tcgdex/cards-database /tmp/tcgdex
-git -C /tmp/tcgdex sparse-checkout set data
-node scripts/build-mapping.mjs /tmp/tcgdex
+npm run mapping                                        # downloads TCGdex into .cache/, writes mapping + mapping-report.html
 ```
 
 Test with fake Cardmarket files:
