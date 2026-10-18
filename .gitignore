@@ -1,0 +1,4 @@
+# The original daily files go to a GitHub release, not into the repository.
+archive/
+node_modules/
+.DS_Store

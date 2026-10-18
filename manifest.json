@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "days": [
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-17",
+    "2026-10-18"
+  ],
+  "catalog": {
+    "singlesEtag": "\"85911d819236798c3644cf4a91720059\"",
+    "nonsinglesEtag": "\"bb919cd441d0857b3428623f085ab125\"",
+    "count": 79782,
+    "updatedAt": "2026-10-18T06:06:26.087Z"
+  },
+  "guideEtag": "\"ab6e270607a2f2d5f0a128525d491d31\"",
+  "sourceCreatedAt": "2026-10-18T02:54:50+0200",
+  "sourceTime": "2026-10-18T00:54:50.000Z",
+  "lastDay": "2026-10-18",
+  "months": [
+    "2026-10"
+  ],
+  "productCount": 79782,
+  "latestFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "historyFields": [
+    "trend",
+    "trend-holo"
+  ],
+  "updatedAt": "2026-10-18T06:06:27.835Z",
+  "mappingVersion": "2026-10-18T06:06:27.826Z",
+  "mapping": {
+    "sets": 219,
+    "cards": 23873,
+    "mapped": 20457,
+    "unknownToCatalogue": 1,
+    "noSetId": 0,
+    "updatedAt": "2026-10-14T16:20:46.858Z"
+  }
+}
