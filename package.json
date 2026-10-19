@@ -7,8 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "prices": "node scripts/update-prices.mjs",
-    "mapping": "node scripts/build-mapping.mjs",
-    "rebuild-history": "node scripts/rebuild-history.mjs"
+    "prices": "cd data && node ../scripts/update-prices.mjs",
+    "mapping": "cd data && node ../scripts/build-mapping.mjs",
+    "rebuild-history": "cd data && node ../scripts/rebuild-history.mjs"
   }
 }

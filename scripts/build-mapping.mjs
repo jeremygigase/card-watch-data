@@ -10,12 +10,15 @@
 import { readdir, readFile, writeFile, access } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ROOT, readJson, writeJson, bucketOf } from './lib.mjs'
 import { parseCardFile, primaryProduct, matchBracket } from './mapping-lib.mjs'
 import { matchExpansion, parseCardMeta, productFitsCard } from './match-lib.mjs'
 
 const CACHE = path.join(ROOT, '.cache', 'tcgdex')
 const REPORT = path.join(ROOT, 'mapping-report.html')
+// Your own fixes are code, not data: they live on main, next to the scripts (the data folder is the current one).
+const OVERRIDES = fileURLToPath(new URL('../mapping/overrides.json', import.meta.url))
 
 async function exists(p) { try { await access(p); return true } catch { return false } }
 async function dirs(p) { return (await readdir(p, { withFileTypes: true })).filter(d => d.isDirectory()).map(d => d.name) }
@@ -106,7 +109,7 @@ async function main() {
   const src = process.argv[2] || await tcgdexCheckout()
   const cat = await loadCatalogue()
   const { sets, noSetId } = await loadTcgdex(src)
-  const overrides = (await readJson(path.join(ROOT, 'mapping', 'overrides.json'))) || {}
+  const overrides = (await readJson(OVERRIDES)) || {}
 
   // Group TCGdex sets per expansion; the set the expansion belongs to comes first.
   const groups = new Map()

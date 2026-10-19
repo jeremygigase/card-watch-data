@@ -1,3 +1,15 @@
+# main holds the code only. The data lives on the `data` branch; locally, check it out into data/
+# (git worktree add data data) and run the jobs there (npm run prices / mapping).
+data/
+
+# Data files that must never land on main again (they belong on the data branch)
+/catalog/
+/history/
+/weekly/
+/latest/
+/manifest.json
+/mapping/cards.json
+
 # The original daily files go to a GitHub release, not into the repository.
 archive/
 node_modules/

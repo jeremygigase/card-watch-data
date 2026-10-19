@@ -117,13 +117,20 @@ scripts/mapping-lib.mjs    parses TCGdex card .ts files; rebucketMapping()
 scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalogue order + name/attacks
 scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
                            without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
-scripts/commit-data.sh     commits everything as ONE orphan commit + force push (keeps the repo small)
+scripts/commit-data.sh     commits the data as ONE orphan commit + force push (keeps the repo small); refuses any branch but `data`
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
                                manual input "rebuild" downloads all archive releases and runs rebuild-history
 .github/workflows/mapping.yml  Mondays 03:00 UTC; sparse-clones tcgdex/cards-database data/
 ```
 
 Both workflows share the concurrency group `card-watch-data`, so they never run at the same time.
+
+**Two branches:** `main` holds the code (scripts, workflows, `mapping/overrides.json`, docs) with a normal history, so feature
+branches and pull requests work. `data` holds the generated files (`manifest.json`, `latest/`, `history/`, `weekly/`, `catalog/`,
+`mapping/cards.json`, `.nojekyll`) and is what GitHub Pages serves; each job run replaces it with a single new commit.
+The workflows check out `main`, then `data` into `data/`, and run `node ../scripts/…` from `data/` (`ROOT = process.cwd()`).
+`build-mapping.mjs` reads `mapping/overrides.json` next to the scripts, not from the data folder.
+Locally: `git worktree add data data` (ignored on main), then `npm run prices` / `npm run mapping`, which `cd data` first.
 
 ### Output formats (served by GitHub Pages)
 
@@ -159,14 +166,14 @@ Both workflows share the concurrency group `card-watch-data`, so they never run 
 Deployment, in this order:
 1. Create the `card-watch-data` GitHub repository and upload the folder, including `.github/` and `.nojekyll`.
 2. Settings → Actions → General → Workflow permissions → **Read and write permissions**.
-3. Settings → Pages → deploy from branch `main`, folder `/` (root).
+3. Settings → Pages → deploy from branch `data`, folder `/` (root). (Create `data` first: an orphan branch with `.nojekyll`.)
 4. Run **Daily prices** once, then **Weekly card mapping** once.
 5. Upload `cardwatch-web` to Bunny.
 6. In the app, enter the Pages address under **Data → Daily prices**.
 
 Unverified against the real thing:
 - **The download server.** The Cardmarket download server's ETag/HEAD behaviour; the script handles a missing ETag by processing anyway.
-- **GitHub Actions:** the release upload (`gh release …`), and that the orphan-commit force push is allowed (no branch protection on `main`).
+- **GitHub Actions:** the release upload (`gh release …`), and that the orphan-commit force push is allowed (no branch protection on `data`; `main` can be protected).
 - **TCGdex CORS:** that TCGdex allows browser requests from your own domain. As far as I know it does, but it hasn't been tested live.
 
 Known limitations:
@@ -196,8 +203,9 @@ The app checks the address field: it accepts any `https://` URL, or `http://loca
 Run the data jobs locally (Node 20+):
 ```
 cd card-watch-data
-node scripts/update-prices.mjs --force                 # needs access to downloads.s3.cardmarket.com
-npm run mapping                                        # downloads TCGdex into .cache/, writes mapping + mapping-report.html
+git worktree add data data                             # once: the data branch in data/ (ignored on main)
+npm run prices -- --force                              # runs in data/; needs access to downloads.s3.cardmarket.com
+npm run mapping                                        # downloads TCGdex into data/.cache/, writes mapping + mapping-report.html
 ```
 
 Test with fake Cardmarket files:

@@ -13,6 +13,15 @@ History starts on the day you set this up; Cardmarket doesn't offer older days.
 
 ## What's in here
 
+The repository has two branches:
+
+- **`main`**: the code (`scripts/`, the workflows, `mapping/overrides.json`, this README), with a normal history.
+  Work on it with branches and pull requests as usual.
+- **`data`**: the generated files below, which GitHub Pages serves. The jobs replace this branch with a single
+  new commit on every run (see "Size"), so never branch off it or open pull requests against it.
+
+On the `data` branch:
+
 ```
 manifest.json                 what's stored: recorded days, last update, field names
 latest/e<expansion>.json      today's prices, one file per Cardmarket expansion (set)
@@ -20,9 +29,14 @@ history/<YYYY-MM>/e<exp>.json all prices per product, only on days they changed 
 weekly/<YYYY-MM>/e<exp>.json  older months, rolled up into weekly averages
 catalog/products.json         every Pokémon product: id, name, expansion, category
 mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name, metacard id, how it was found]
+```
+
+On `main`:
+
+```
 mapping/overrides.json        your own fixes to the mapping (card code -> product id, or null; set -> expansion)
-scripts/                      the jobs (Node 20, no dependencies)
-.github/workflows/            daily prices, weekly mapping
+scripts/                      the jobs (Node 20, no dependencies); they read and write the data in the current folder
+.github/workflows/            daily prices, weekly mapping; they check out main for the code and data into data/
 ```
 
 Releases named `archive-YYYY-MM` hold Cardmarket's original file of every day, gzipped,
@@ -44,13 +58,19 @@ so you can rebuild or extend the history later (for example with fields this rep
 ## Set it up (about 10 minutes)
 
 1. **Create a repository** on GitHub, for example `card-watch-data`, and upload everything in this folder
-   (including the hidden `.github` folder and `.nojekyll`).
-2. **Let the jobs save data:** Settings → Actions → General → Workflow permissions → **Read and write permissions** → Save.
-3. **Publish it:** Settings → Pages → Source: **Deploy from a branch**, branch `main`, folder `/ (root)` → Save.
+   (including the hidden `.github` folder) to `main`.
+2. **Create the data branch** (empty except for `.nojekyll` and a `.gitignore` with `archive/`, `.cache/` and
+   `mapping-report.html`):
+   ```
+   git switch --orphan data && touch .nojekyll && printf 'archive/\n.cache/\nmapping-report.html\n' > .gitignore
+   git add .nojekyll .gitignore && git commit -m "Empty data" && git push origin data && git switch main
+   ```
+3. **Let the jobs save data:** Settings → Actions → General → Workflow permissions → **Read and write permissions** → Save.
+4. **Publish it:** Settings → Pages → Source: **Deploy from a branch**, branch `data`, folder `/ (root)` → Save.
    Your address will be `https://<your-github-name>.github.io/card-watch-data/`.
-4. **First run:** Actions → **Daily prices** → Run workflow. Wait for it to finish (a few minutes).
-5. **Then:** Actions → **Weekly card mapping** → Run workflow.
-6. **Connect the app:** in Card Watch, open **Data → Daily prices**, paste the address from step 3, press **Save and test**.
+5. **First run:** Actions → **Daily prices** → Run workflow. Wait for it to finish (a few minutes).
+6. **Then:** Actions → **Weekly card mapping** → Run workflow.
+7. **Connect the app:** in Card Watch, open **Data → Daily prices**, paste the address from step 4, press **Save and test**.
 
 After that it runs by itself: prices every night around 03:30 Belgian time (with a second try at 09:30),
 the mapping every Monday.
@@ -64,7 +84,9 @@ changes on a given day; six days with all 12 fields took 13 MB). Months older th
 up into weekly averages, so the daily part stays around 150–250 MB and each year adds roughly 150–250 MB
 of weekly averages, well within GitHub's limits for several years. Cardmarket's original daily files
 stay in the release archive, so the daily detail is never lost.
-The repository keeps a single commit (see `scripts/commit-data.sh`), so it doesn't grow with every day.
+The `data` branch keeps a single commit (see `scripts/commit-data.sh`), so the repository doesn't grow with every day:
+the history is inside the files, so older commits would only be old copies of them. Only `data` is squashed like this;
+the script refuses to run on any other branch, so `main` keeps its history.
 When it gets large after a few years, move old `history/` months elsewhere; the release archive keeps everything.
 
 ## Usage terms
@@ -88,13 +110,14 @@ entry says how a card was linked:
 - `tcgdex`: TCGdex's own link, for cards the catalogue can't place
 - `override`: your own choice from `mapping/overrides.json`
 
-Run it on your computer (Node 20+ and git; the first run downloads TCGdex's card data into `.cache/`):
+Run it on your computer (Node 20+ and git; see "Run it on your own computer" for the `data/` folder;
+the first run downloads TCGdex's card data into `data/.cache/`):
 
 ```
 npm run mapping
 ```
 
-Then open `mapping-report.html` (not committed). Per set it shows the links that differ from TCGdex,
+Then open `data/mapping-report.html` (not committed). Per set it shows the links that differ from TCGdex,
 cards without a product, products no card got, and **cards where two products fit** with both prices,
 so you can decide. To change a link, add it to `mapping/overrides.json` and run again:
 
@@ -105,15 +128,22 @@ so you can decide. To change a link, add it to `mapping/overrides.json` and run 
 A number links that product; `null` removes the link (the app then has no price for that card).
 `sets` tells which Cardmarket expansion a whole TCGdex set belongs to, for sets whose TCGdex data has no
 Cardmarket link (the Nintendo, BW and Shiny Vault promos, the XY trainer kits); the matching then runs as usual.
-Commit `mapping/cards.json`, `mapping/overrides.json` and `manifest.json`. The weekly job runs the same
-script with the same overrides, so it keeps your choices.
+Commit `mapping/overrides.json` to `main` (through a pull request), then run Actions → **Weekly card mapping**
+to publish the new mapping. The weekly job runs the same script with the same overrides, so it keeps your choices.
 
 ## Run it on your own computer
 
+The jobs read and write the data in the folder they run in. On `main`, check the `data` branch out into
+`data/` once (it's ignored on `main`), then use the npm scripts, which run there:
+
 ```
-node scripts/update-prices.mjs --force
+git fetch origin data && git worktree add data data
+git -C data fetch origin data && git -C data reset --hard origin/data     # later: get the newest data
+npm run prices -- --force
 npm run mapping
 ```
+
+Don't push from `data/`: the jobs replace that branch every day, so publish changes through the workflows.
 
 ## Rebuild the history
 
@@ -121,6 +151,6 @@ After the history format changed (or to fill a gap), rebuild it from the release
 Actions → **Daily prices** → Run workflow → tick **Rebuild the whole history**. Or on your computer:
 
 ```
-gh release download archive-2026-10 -D .cache/archive     # each month you want
+gh release download archive-2026-10 -D data/.cache/archive     # each month you want
 npm run rebuild-history -- .cache/archive
 ```
