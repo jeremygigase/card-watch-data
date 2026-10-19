@@ -12,6 +12,10 @@ on:
         description: 'Process even if the price guide did not change'
         type: boolean
         default: false
+      rebuild:
+        description: 'Rebuild the whole history from the archive releases (after a history format change)'
+        type: boolean
+        default: false
 
 concurrency:
   group: card-watch-data          # never run at the same time as the mapping job
@@ -48,6 +52,17 @@ jobs:
             gh release create "$tag" --title "Price guide archive $(date -u +%Y-%m)" \
               --notes "Cardmarket's original daily Pokémon price guide files, gzipped. One file per day."
           gh release upload "$tag" "${files[@]}" --clobber
+
+      - name: Rebuild the history from the archive releases
+        if: ${{ inputs.rebuild }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .cache/archive
+          for tag in $(gh release list --limit 200 --json tagName -q '.[].tagName' | grep '^archive-'); do
+            gh release download "$tag" -D .cache/archive --clobber
+          done
+          node scripts/rebuild-history.mjs .cache/archive
 
       - name: Save the data (one commit, so the repository stays small)
         run: bash scripts/commit-data.sh "Prices of $(node -p "require('./manifest.json').lastDay")"

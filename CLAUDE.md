@@ -110,13 +110,16 @@ Rules worth knowing:
 
 ```
 scripts/lib.mjs            shared helpers; URLs (override base with env CM_BASE for testing); bucketOf()
-scripts/update-prices.mjs  nightly job (flag --force ignores the ETag check)
+scripts/update-prices.mjs  nightly job (flag --force ignores the ETag check); rolls months older than 90 days into weekly/
+scripts/history-lib.mjs    history format: recordDay() (change-only points, all 12 fields), upgradeMonth(), weekly roll-up (rollupDue)
+scripts/rebuild-history.mjs  npm run rebuild-history -- <dir of archive .json.gz>: rebuilds history/ from the release archive
 scripts/mapping-lib.mjs    parses TCGdex card .ts files; rebucketMapping()
 scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalogue order + name/attacks
 scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
                            without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
 scripts/commit-data.sh     commits everything as ONE orphan commit + force push (keeps the repo small)
-.github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM
+.github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
+                               manual input "rebuild" downloads all archive releases and runs rebuild-history
 .github/workflows/mapping.yml  Mondays 03:00 UTC; sparse-clones tcgdex/cards-database data/
 ```
 
@@ -124,14 +127,17 @@ Both workflows share the concurrency group `card-watch-data`, so they never run 
 
 ### Output formats (served by GitHub Pages)
 
-- **`manifest.json`:** `{lastDay, days[], months[], sourceTime, productCount, latestFields, historyFields, mappingVersion, guideEtag, catalog{…}, mapping{stats}}`
+- **`manifest.json`:** `{lastDay, days[], months[], weeklyMonths[], sourceTime, productCount, latestFields, historyFields, weeklyFields, historyVersion, historyBytes{}, mappingVersion, guideEtag, catalog{…}, mapping{stats}}`. `days`/`months` list only the daily history; `historyVersion` 2 = all 12 fields (1 = trend only; the app refetches history when it goes up).
 - **`latest/<file>.json`:** `{day, fields: [low, trend, avg, avg1, avg7, avg30, low-holo, trend-holo, avg-holo, avg1-holo, avg7-holo, avg30-holo], p: {idProduct: [values]}}`
-- **`history/<YYYY-MM>/<file>.json`:** `{fields: [trend, trend-holo], p: {idProduct: [[day, trend, trendHolo], …]}}`
-  - A point holds from its day until the next point.
+- **`history/<YYYY-MM>/<file>.json`:** `{fields: [the 12 latest fields], p: {idProduct: [[day, ...values], …]}}` (daily, last 90 days)
+  - A point is written when any field changes and holds from its day until the next point. Trailing nulls are left out.
   - Each month starts with a full point, so a month file can be read on its own.
-  - A point that is all `null` means the product left the price guide.
+  - A point without values (`[day]`) means the product left the price guide.
+  - Older month files (`fields: [trend, trend-holo]`) are converted by `upgradeMonth()`.
+- **`weekly/<YYYY-MM>/<file>.json`:** months older than 90 days (`manifest.weeklyMonths`), rolled up into 4 weeks per month (days 1–7, 8–14, 15–21, 22–end): `{fields: [12 means, trend-min, trend-max], p: {idProduct: [[weekStartDay, ...values], …]}}`, also change-only (hold until the next point); a recorded week without prices is an empty point. The daily folder is deleted afterwards; the release archive keeps the originals.
 - **`mapping/cards.json`:** `{version, catalogVersion, fields: [idProduct, file, idMetacard, how], cards: {"base5-22": [274075, "e1528", 211936, "order"]}, variants: {cardId: {"holo+1st-edition": id}}, sets: {"neo1": 1531}}`
   - `how`: `order` (lined up with the expansion's products by card number vs product id, name + attacks must fit), `name` (only fitting left-over product), `tcgdex` (TCGdex's own link), `override` (from `mapping/overrides.json`).
+  - `mapping/overrides.json` `sets: {tcgdexSetId: idExpansion}` places sets TCGdex gives no Cardmarket link (np → 1608, bwp → 1611, sma → 2514 with Hidden Fates, tk-xy-* → 1631/1632/1683/1707).
   - Why: TCGdex gives holo and non-holo printings of old cards the same Cardmarket id; Cardmarket has one product per printing, created in card-number order.
 - **`catalog/products.json`:** `{fields: [idProduct, name, idExpansion, idCategory, categoryName, idMetacard, dateAdded], rows}`
 - **File names** ("buckets"): `e<idExpansion>`, or `x<idProduct % 50>` for products without an expansion.
@@ -141,9 +147,9 @@ Both workflows share the concurrency group `card-watch-data`, so they never run 
 
 | What | Result |
 |---|---|
-| Real TCGdex data | 219 sets, 23,873 cards; 20,457 (86%) linked to a Cardmarket product |
+| Real TCGdex data | 219 sets, 23,873 cards; 21,197 (89%) linked to a Cardmarket product (with the `sets` overrides) |
 | Real catalogue | 79,767 products (74,694 singles, 5,073 sealed/other) |
-| History per run | about 18% of products change trend price per day; 3 days ≈ 5 MB; estimate 150–250 MB per year |
+| History per run | about 25% of products change some price per day (all 12 fields); 6 days ≈ 13 MB; daily part (90 days) ≈ 150–250 MB, weekly ≈ 150–250 MB per year |
 | Latest | about 7 MB in total, 787 set files |
 
 ---
@@ -168,15 +174,14 @@ Known limitations:
 - **About 14% of TCGdex cards have no Cardmarket link** (mostly very new or unusual cards); those fall back to TCGdex prices.
 - **The collection lives per browser and device.** Moving it means backup and restore; there's no sync.
 - **GitHub Pages on a free account means a public repository**, so the full price guide becomes publicly readable. Check Cardmarket's terms before sharing the app with others.
-- **Long-term size:** after a few years, `history/` will need old months moved out. The release archive keeps the originals.
+- **Long-term size:** months older than 90 days are rolled into weekly averages; after several years `weekly/` may need a monthly roll-up (same `rollupSeries`, bigger buckets). The release archive keeps the originals.
 
 Feature ideas, roughly in order:
 1. **Price alerts:** a target price per card, shown when crossed (in-app; push needs a server).
-2. **Card detail chart** over 30/90/365 days, now that real history exists.
-3. **Sealed products** (boosters, displays). They're already in the price data (`catalog`, `x*`/`e*` files); they just need a way to search and add them in the app.
-4. **Market views** across all products: biggest risers and fallers this week. This needs either a precomputed file in the data job or a database such as SQLite.
-5. **Collection sync between devices:** a small backend, or encrypted backup to the data repository.
-6. **Dutch sets** (Base/Jungle/Fossil): check how TCGdex and Cardmarket represent them; Cardmarket lists language per offer, not per product.
+2. **Sealed products** (boosters, displays). They're already in the price data (`catalog`, `x*`/`e*` files); they just need a way to search and add them in the app.
+3. **Market views** across all products: biggest risers and fallers this week. This needs either a precomputed file in the data job or a database such as SQLite.
+4. **Collection sync between devices:** a small backend, or encrypted backup to the data repository.
+5. **Dutch sets** (Base/Jungle/Fossil): check how TCGdex and Cardmarket represent them; Cardmarket lists language per offer, not per product.
 
 ---
 

@@ -1,3 +1,17 @@
 {
-  "_comment": "Your own fixes, applied after the automatic matching. \"card code\": Cardmarket idProduct, or null to remove a link. Example: \"sm1-24\": 294121"
+  "_comment": "Your own fixes, applied after the automatic matching. \"card code\": Cardmarket idProduct, or null to remove a link. Example: \"sm1-24\": 294121",
+  "_sets": "\"sets\": TCGdex set id -> Cardmarket idExpansion, for sets whose TCGdex data has no Cardmarket link.",
+  "sets": {
+    "np": 1608,
+    "bwp": 1611,
+    "sma": 2514,
+    "tk-xy-b": 1632,
+    "tk-xy-w": 1632,
+    "tk-xy-latia": 1683,
+    "tk-xy-latio": 1683,
+    "tk-xy-n": 1631,
+    "tk-xy-sy": 1631,
+    "tk-xy-p": 1707,
+    "tk-xy-su": 1707
+  }
 }
