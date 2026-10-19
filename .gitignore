@@ -1,0 +1,8 @@
+# The original daily files go to a GitHub release, not into the repository.
+archive/
+node_modules/
+.DS_Store
+
+# Local mapping run: TCGdex download and the review page
+.cache/
+mapping-report.html

@@ -1,0 +1,37 @@
+name: Weekly card mapping
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'           # Mondays, after the daily prices run
+  workflow_dispatch: {}
+
+concurrency:
+  group: card-watch-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  mapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Get TCGdex's card database (only the data folder)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/tcgdex/cards-database "$RUNNER_TEMP/tcgdex"
+          git -C "$RUNNER_TEMP/tcgdex" sparse-checkout set data
+
+      - name: Link TCGdex cards to Cardmarket products
+        run: node scripts/build-mapping.mjs "$RUNNER_TEMP/tcgdex"
+
+      - name: Save the data
+        run: bash scripts/commit-data.sh "Card mapping of $(date -u +%Y-%m-%d)"

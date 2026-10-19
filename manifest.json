@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "days": [
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-17",
+    "2026-10-18",
+    "2026-10-19"
+  ],
+  "catalog": {
+    "singlesEtag": "\"b01c710f5d3466f6cfc9a633128964f8\"",
+    "nonsinglesEtag": "\"17be31a464008e1cca148f2e60041943\"",
+    "count": 79782,
+    "updatedAt": "2026-10-19T06:21:38.436Z"
+  },
+  "guideEtag": "\"dfe0a0a545b488f8e25c3888b66a9bc6\"",
+  "sourceCreatedAt": "2026-10-19T02:42:46+0200",
+  "sourceTime": "2026-10-19T00:42:46.000Z",
+  "lastDay": "2026-10-19",
+  "months": [
+    "2026-10"
+  ],
+  "productCount": 79782,
+  "latestFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "historyFields": [
+    "trend",
+    "trend-holo"
+  ],
+  "updatedAt": "2026-10-19T06:21:39.800Z",
+  "mappingVersion": "2026-10-19T08:32:50.526Z",
+  "mapping": {
+    "sets": 219,
+    "cards": 23873,
+    "mapped": 20796,
+    "byOrder": 19393,
+    "byName": 876,
+    "byTcgdex": 527,
+    "byOverride": 0,
+    "changedFromTcgdex": 1327,
+    "unknownToCatalogue": 0,
+    "noSetId": 0,
+    "updatedAt": "2026-10-19T08:32:50.526Z"
+  }
+}
