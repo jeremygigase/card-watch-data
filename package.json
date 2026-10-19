@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "description": "Daily Cardmarket Pokémon prices and history for Card Watch",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "prices": "node scripts/update-prices.mjs",
-    "mapping": "node scripts/build-mapping.mjs"
+    "prices": "cd data && node ../scripts/update-prices.mjs",
+    "mapping": "cd data && node ../scripts/build-mapping.mjs",
+    "rebuild-history": "cd data && node ../scripts/rebuild-history.mjs"
   }
 }

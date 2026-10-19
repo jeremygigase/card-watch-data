@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Daily job: downloads Cardmarket's Pokémon price guide and product catalogue and updates
 //   latest/<set>.json             today's full prices per product, one file per Cardmarket expansion
-//   history/<YYYY-MM>/<set>.json  trend prices per product, stored only on days they change
+//   history/<YYYY-MM>/<set>.json  all prices per product, stored only on days they change (history-lib.mjs)
+//   weekly/<YYYY-MM>/<set>.json   months older than 90 days, rolled up into weekly averages
 //   catalog/products.json         every Pokémon product: id, name, expansion, category
 //   archive/                      today's original file, gzipped (uploaded to a GitHub release, not committed)
 //   manifest.json                 what's here: days recorded, last update, field names
@@ -12,16 +13,14 @@
 import { writeFile, mkdir } from 'node:fs/promises'
 import { gzipSync } from 'node:zlib'
 import path from 'node:path'
-import { ROOT, URLS, readJson, writeJson, head, getJson, brusselsDay, isoTime, bucketOf, emptyDir, listJson } from './lib.mjs'
+import { ROOT, URLS, readJson, writeJson, head, getJson, brusselsDay, isoTime, bucketOf, emptyDir } from './lib.mjs'
 import { rebucketMapping } from './mapping-lib.mjs'
+import { LATEST_FIELDS, HISTORY_FIELDS, HISTORY_VERSION, WEEKLY_FIELDS, valuesOf, readMonth, writeMonth, recordDay, rollupDue, historySizes } from './history-lib.mjs'
 
 const FORCE = process.argv.includes('--force')
-const LATEST_FIELDS = ['low', 'trend', 'avg', 'avg1', 'avg7', 'avg30', 'low-holo', 'trend-holo', 'avg-holo', 'avg1-holo', 'avg7-holo', 'avg30-holo']
-const HISTORY_FIELDS = ['trend', 'trend-holo']
 const P = (...p) => path.join(ROOT, ...p)
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
-const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
 
 async function updateCatalog(manifest) {
   const [singlesTag, nonsinglesTag] = await Promise.all([head(URLS.singles), head(URLS.nonsingles)])
@@ -76,14 +75,14 @@ async function main() {
 
   // ---- latest: full prices per product, grouped by expansion ----
   const latest = new Map()
-  const today = new Map()           // idProduct -> [trend, trend-holo]
+  const today = new Map()           // idProduct -> all fields, HISTORY_FIELDS order
   for (const g of guide.priceGuides) {
     const id = g.idProduct
     if (typeof id !== 'number') continue
     const b = bucketOf(id, expansionOf.get(id))
     if (!latest.has(b)) latest.set(b, {})
     latest.get(b)[id] = LATEST_FIELDS.map(f => num(g[f]))
-    today.set(id, HISTORY_FIELDS.map(f => num(g[f])))
+    today.set(id, valuesOf(g))
   }
   await emptyDir(P('latest'))
   for (const [b, rows] of latest) {
@@ -91,40 +90,10 @@ async function main() {
   }
   console.log(`  wrote ${latest.size} latest files`)
 
-  // ---- history: one point per product per change, per month ----
-  // Each month file starts with the value on the first recorded day, so a month can be read on its own.
-  const monthDir = P('history', month)
-  const files = new Map()
-  for (const f of await listJson(monthDir)) files.set(f.slice(0, -5), await readJson(path.join(monthDir, f)))
-  const fileFor = (b) => {
-    if (!files.has(b)) files.set(b, { fields: HISTORY_FIELDS, p: {} })
-    return files.get(b)
-  }
-  const seen = new Set()
-  const record = (b, id, vals) => {
-    const series = (fileFor(b).p[id] ||= [])
-    const last = series[series.length - 1]
-    if (last && last[0] === day) {
-      series.pop()                                           // re-run on the same day: replace it
-      const prev = series[series.length - 1]
-      if (!prev || !same(prev.slice(1), vals)) series.push([day, ...vals])
-    } else if (!last || !same(last.slice(1), vals)) {
-      series.push([day, ...vals])
-    }
-  }
-  for (const [id, vals] of today) {
-    record(bucketOf(id, expansionOf.get(id)), id, vals)
-    seen.add(String(id))
-  }
-  // Products that disappeared from the price guide get an empty point, so the app stops showing an old price.
-  for (const [b, file] of files) {
-    for (const id of Object.keys(file.p)) {
-      if (seen.has(id)) continue
-      const last = file.p[id][file.p[id].length - 1]
-      if (last && last[0] < day && !last.slice(1).every(v => v === null)) record(b, id, HISTORY_FIELDS.map(() => null))
-    }
-  }
-  for (const [b, file] of files) await writeJson(path.join(monthDir, `${b}.json`), file)
+  // ---- history: one point per product per change, per month (all fields) ----
+  const files = await readMonth(month)
+  recordDay(files, day, today, expansionOf)
+  await writeMonth(month, files)
   console.log(`  updated ${files.size} history files for ${month}`)
 
   // Products can move to another expansion when the catalogue changes; keep the mapping's file hints in step.
@@ -136,10 +105,16 @@ async function main() {
   manifest.sourceTime = isoTime(guide.createdAt)
   manifest.lastDay = day
   manifest.days = [...new Set([...(manifest.days || []), day])].sort()
-  manifest.months = [...new Set(manifest.days.map(d => d.slice(0, 7)))]
+  await rollupDue(manifest, day)                             // months older than 90 days -> weekly/
   manifest.productCount = today.size
   manifest.latestFields = LATEST_FIELDS
   manifest.historyFields = HISTORY_FIELDS
+  manifest.weeklyFields = WEEKLY_FIELDS
+  manifest.historyVersion = HISTORY_VERSION
+  manifest.historyBytes = await historySizes()
+  const mb = (b) => (b / 1e6).toFixed(1) + ' MB'
+  console.log(`  history size: ${mb(Object.values(manifest.historyBytes).reduce((a, b) => a + b, 0))} ` +
+    `(${Object.entries(manifest.historyBytes).map(([k, v]) => `${k} ${mb(v)}`).join(', ')})`)
   manifest.updatedAt = new Date().toISOString()
   await writeJson(P('manifest.json'), manifest, true)
   console.log('Done.')

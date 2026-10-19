@@ -10,12 +10,15 @@
 import { readdir, readFile, writeFile, access } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ROOT, readJson, writeJson, bucketOf } from './lib.mjs'
 import { parseCardFile, primaryProduct, matchBracket } from './mapping-lib.mjs'
 import { matchExpansion, parseCardMeta, productFitsCard } from './match-lib.mjs'
 
 const CACHE = path.join(ROOT, '.cache', 'tcgdex')
 const REPORT = path.join(ROOT, 'mapping-report.html')
+// Your own fixes are code, not data: they live on main, next to the scripts (the data folder is the current one).
+const OVERRIDES = fileURLToPath(new URL('../mapping/overrides.json', import.meta.url))
 
 async function exists(p) { try { await access(p); return true } catch { return false } }
 async function dirs(p) { return (await readdir(p, { withFileTypes: true })).filter(d => d.isDirectory()).map(d => d.name) }
@@ -87,7 +90,9 @@ async function loadTcgdex(src) {
 
 /* Which Cardmarket expansion a TCGdex set belongs to. Usually the set file says so; when it says
    nothing or disagrees with where its cards' links point, take whichever the catalogue fits best. */
-function chooseExpansion(set, cat) {
+function chooseExpansion(set, cat, setOverrides = {}) {
+  const forced = setOverrides[set.id]
+  if (forced != null && cat.singles.has(Number(forced))) return Number(forced)   // mapping/overrides.json "sets"
   const votes = new Map()
   for (const c of set.cards) {
     const e = c.tcgdex != null ? cat.info.get(c.tcgdex)?.idExpansion : undefined
@@ -104,11 +109,12 @@ async function main() {
   const src = process.argv[2] || await tcgdexCheckout()
   const cat = await loadCatalogue()
   const { sets, noSetId } = await loadTcgdex(src)
+  const overrides = (await readJson(OVERRIDES)) || {}
 
   // Group TCGdex sets per expansion; the set the expansion belongs to comes first.
   const groups = new Map()
   for (const s of sets) {
-    s.exp = chooseExpansion(s, cat)
+    s.exp = chooseExpansion(s, cat, overrides.sets)
     if (s.exp == null) continue
     if (!groups.has(s.exp)) groups.set(s.exp, [])
     groups.get(s.exp).push(s)
@@ -144,9 +150,8 @@ async function main() {
     }
   }
   // 4: your own decisions in mapping/overrides.json win: { "sm1-24": 294121, "base1-58": null }
-  const overrides = (await readJson(path.join(ROOT, 'mapping', 'overrides.json'))) || {}
   for (const [id, product] of Object.entries(overrides)) {
-    if (id.startsWith('_')) continue                       // "_comment" keys
+    if (id.startsWith('_') || id === 'sets') continue      // "_comment" keys; "sets" is used by chooseExpansion
     if (product == null) link.delete(id)
     else link.set(id, { idProduct: Number(product), how: 'override' })
   }
@@ -170,9 +175,13 @@ async function main() {
       stats[{ order: 'byOrder', name: 'byName', tcgdex: 'byTcgdex', override: 'byOverride' }[l.how]]++
       if (!p) stats.unknownToCatalogue++
       if (c.tcgdex != null && c.tcgdex !== l.idProduct) stats.changedFromTcgdex++
-      // TCGdex's printings (1st edition, stamps, …), minus links that belong to another card.
+      // TCGdex's printings (1st edition, stamps, shadowless, jumbo …), minus links that belong to another card.
       const vs = c.parsed.variants.filter(v => (primaryOf.get(v.id) ?? c.id) === c.id)
-      if (vs.some(v => v.id !== l.idProduct)) variants[c.id] = Object.fromEntries(vs.map(v => [[v.type, v.subtype, ...v.stamps, v.size].filter(Boolean).join('+'), v.id]))
+      const pv = printingKeys(vs)
+      // Plain printings ("normal", "holo", "reverse") are the card itself and follow its own product
+      // (above). TCGdex sometimes links them to a later reprint, which priced plain copies far too high.
+      for (const k of Object.keys(pv)) if (!k.includes('+')) delete pv[k]
+      if (Object.values(pv).some(id => id !== l.idProduct)) variants[c.id] = pv
     }
   }
 
@@ -208,6 +217,23 @@ async function main() {
   if (stats.unknownToCatalogue) console.log(`  ${stats.unknownToCatalogue} linked products aren't in the current catalogue`)
   if (page.toCheck) console.log(`  ${page.toCheck} cards where two products fit: check them in the report`)
   console.log(`Wrote mapping/cards.json. Review: open mapping-report.html`)
+}
+
+/* Keys for a card's printings, in the form the app looks them up: version + stamps ("holo",
+   "holo+1st-edition"), plus the TCGdex subtype ("holo+shadowless") and size ("holo+jumbo") where given.
+   Plain keys only come from plain printings: a "shadowless" printing never becomes plain "holo",
+   so a regular copy keeps the card's own product. The first printing with a key wins. */
+function printingKeys(vs) {
+  const out = {}
+  const add = (parts, id) => { const k = parts.filter(Boolean).join('+'); if (!(k in out)) out[k] = id }
+  const plain = vs.filter(v => !v.subtype && !v.size)
+  for (const v of plain) add([v.type, ...v.stamps], v.id)
+  for (const v of vs.filter(v => v.subtype && !v.size)) {
+    add([v.type, v.subtype, ...v.stamps], v.id)
+    if (v.stamps.length) add([v.type, ...v.stamps], v.id)          // "holo+1st-edition"
+  }
+  for (const v of vs.filter(v => v.size)) add([v.type, ...v.stamps, v.size], v.id)
+  return out
 }
 
 /* ---------- review page ---------- */

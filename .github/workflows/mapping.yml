@@ -16,9 +16,20 @@ jobs:
   mapping:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: data   # the scripts read and write the data in the current folder
     steps:
-      - uses: actions/checkout@v4
+      - name: Get the code (main)
+        uses: actions/checkout@v4
         with:
+          fetch-depth: 1
+
+      - name: Get the data (data branch)
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
@@ -31,7 +42,7 @@ jobs:
           git -C "$RUNNER_TEMP/tcgdex" sparse-checkout set data
 
       - name: Link TCGdex cards to Cardmarket products
-        run: node scripts/build-mapping.mjs "$RUNNER_TEMP/tcgdex"
+        run: node ../scripts/build-mapping.mjs "$RUNNER_TEMP/tcgdex"
 
       - name: Save the data
-        run: bash scripts/commit-data.sh "Card mapping of $(date -u +%Y-%m-%d)"
+        run: bash ../scripts/commit-data.sh "Card mapping of $(date -u +%Y-%m-%d)"

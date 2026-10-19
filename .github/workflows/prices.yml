@@ -12,6 +12,10 @@ on:
         description: 'Process even if the price guide did not change'
         type: boolean
         default: false
+      rebuild:
+        description: 'Rebuild the whole history from the archive releases (after a history format change)'
+        type: boolean
+        default: false
 
 concurrency:
   group: card-watch-data          # never run at the same time as the mapping job
@@ -24,9 +28,23 @@ jobs:
   prices:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: data   # the scripts read and write the data in the current folder
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Get the code (main)
+        uses: actions/checkout@v4
         with:
+          fetch-depth: 1
+
+      - name: Get the data (data branch)
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
@@ -34,11 +52,9 @@ jobs:
           node-version: 20
 
       - name: Download and store today's prices
-        run: node scripts/update-prices.mjs ${{ inputs.force && '--force' || '' }}
+        run: node ../scripts/update-prices.mjs ${{ inputs.force && '--force' || '' }}
 
       - name: Archive the original price guide in a monthly release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
           files=(archive/*.json.gz)
@@ -49,5 +65,14 @@ jobs:
               --notes "Cardmarket's original daily Pokémon price guide files, gzipped. One file per day."
           gh release upload "$tag" "${files[@]}" --clobber
 
-      - name: Save the data (one commit, so the repository stays small)
-        run: bash scripts/commit-data.sh "Prices of $(node -p "require('./manifest.json').lastDay")"
+      - name: Rebuild the history from the archive releases
+        if: ${{ inputs.rebuild }}
+        run: |
+          mkdir -p .cache/archive
+          for tag in $(gh release list --limit 200 --json tagName -q '.[].tagName' | grep '^archive-'); do
+            gh release download "$tag" -D .cache/archive --clobber
+          done
+          node ../scripts/rebuild-history.mjs .cache/archive
+
+      - name: Save the data (one commit on the data branch, so the repository stays small)
+        run: bash ../scripts/commit-data.sh "Prices of $(node -p "require('./manifest.json').lastDay")"
