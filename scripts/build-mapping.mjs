@@ -151,18 +151,21 @@ async function main() {
   }
   // 4: your own decisions in mapping/overrides.json win: { "sm1-24": 294121, "base1-58": null }
   for (const [id, product] of Object.entries(overrides)) {
-    if (id.startsWith('_') || id === 'sets') continue      // "_comment" keys; "sets" is used by chooseExpansion
+    if (id.startsWith('_') || id === 'sets' || id === 'custom') continue   // "_comment" keys; "sets": chooseExpansion; "custom": step 5
     if (product == null) link.delete(id)
     else link.set(id, { idProduct: Number(product), how: 'override' })
   }
+  // 5: cards TCGdex doesn't have at all (mapping/overrides.json "custom"), such as Japan's Premium File promos.
+  const custom = customCards(overrides.custom, cat)
   used.clear()
   for (const l of link.values()) used.add(l.idProduct)
+  for (const c of custom.cards) if (c.idProduct != null) used.add(c.idProduct)
   for (const [exp, list] of leftovers) leftovers.set(exp, list.filter(p => !used.has(p.idProduct)))
 
   // Output, same shape as before plus idMetacard and how each link was found.
   const primaryOf = new Map([...link].map(([id, l]) => [l.idProduct, id]))
   const cards = {}, variants = {}, setsOut = {}
-  const stats = { sets: sets.length, cards: 0, mapped: 0, byOrder: 0, byName: 0, byTcgdex: 0, byOverride: 0, changedFromTcgdex: 0, unknownToCatalogue: 0, noSetId }
+  const stats = { sets: sets.length, cards: 0, mapped: 0, byOrder: 0, byName: 0, byTcgdex: 0, byOverride: 0, byCustom: 0, changedFromTcgdex: 0, unknownToCatalogue: 0, noSetId }
   for (const s of sets) {
     if (s.exp != null) setsOut[s.id] = s.exp
     for (const c of s.cards) {
@@ -185,6 +188,16 @@ async function main() {
     }
   }
 
+  const customOut = { sets: custom.sets, cards: {} }
+  for (const c of custom.cards) {
+    customOut.cards[c.id] = c.info
+    if (c.idProduct == null) continue            // listed for the set, but Cardmarket has no product: no price
+    const p = cat.info.get(c.idProduct)
+    if (!p) { stats.unknownToCatalogue++; console.warn(`  custom card ${c.id}: product ${c.idProduct} isn't in the catalogue`) }
+    cards[c.id] = [c.idProduct, bucketOf(c.idProduct, p?.idExpansion), p?.idMetacard ?? null, 'custom']
+    stats.byCustom++
+  }
+
   const version = new Date().toISOString()
   const manifest = (await readJson(path.join(ROOT, 'manifest.json'))) || { version: 1, days: [] }
   await writeJson(path.join(ROOT, 'mapping', 'cards.json'), {
@@ -195,6 +208,7 @@ async function main() {
     cards,
     variants,
     sets: setsOut,
+    custom: customOut,
   })
   manifest.mappingVersion = version
   manifest.mapping = { ...stats, updatedAt: version }
@@ -214,9 +228,55 @@ async function main() {
   console.log(`Sets: ${stats.sets}, cards: ${stats.cards}, linked to Cardmarket: ${stats.mapped} (${pct(stats.mapped)}%)`)
   console.log(`  by catalogue order ${stats.byOrder}, by unique name ${stats.byName}, TCGdex's link ${stats.byTcgdex}`)
   console.log(`  ${stats.changedFromTcgdex} cards now point to a different product than TCGdex says`)
+  if (stats.byCustom) console.log(`  plus ${stats.byCustom} cards TCGdex doesn't have, from mapping/overrides.json "custom"`)
   if (stats.unknownToCatalogue) console.log(`  ${stats.unknownToCatalogue} linked products aren't in the current catalogue`)
   if (page.toCheck) console.log(`  ${page.toCheck} cards where two products fit: check them in the report`)
   console.log(`Wrote mapping/cards.json. Review: open mapping-report.html`)
+}
+
+/* Cards TCGdex doesn't have, from mapping/overrides.json "custom":
+     { "pf2": { "lang": "ja", "name": "Premium File 2", "cards": [{ "n": 3, "name": "Pichu", "idProduct": 571910 }, …] } }
+   Each card gets the code "<lang>:<set>-<n>" ("ja:pf2-3"), the form the app uses for non-English cards
+   ("<set>-<n>" for English). Everything but idProduct is passed on to the app as the card's details.
+   "idProduct": null lists a card that Cardmarket has no product for: it's in the set, without a price.
+   A set with "expansion" instead of "cards" is built from that Cardmarket expansion: one card per product
+   name, numbered in product order and linked to the first product with that name (see expansionCards). */
+function customCards(spec = {}, cat) {
+  const sets = {}, cards = [], seen = new Set()
+  for (const [setId, s] of Object.entries(spec)) {
+    if (setId.startsWith('_')) continue
+    const { cards: given, expansion, ...info } = s
+    const list = given ?? expansionCards(setId, expansion, cat)
+    const prefix = info.lang && info.lang !== 'en' ? `${info.lang}:` : ''
+    sets[setId] = { ...info, total: list.length }
+    for (const c of list) {
+      const { idProduct, ...rest } = c
+      const id = `${prefix}${setId}-${c.n}`
+      if (c.n == null || (idProduct !== null && !Number.isInteger(Number(idProduct)))) throw new Error(`mapping/overrides.json custom "${setId}": every card needs "n" and an "idProduct" (a number, or null when Cardmarket has none) (${JSON.stringify(c)})`)
+      if (seen.has(id)) throw new Error(`mapping/overrides.json custom: ${id} appears twice`)
+      seen.add(id)
+      cards.push({ id, idProduct: idProduct === null ? null : Number(idProduct), info: { set: setId, ...rest } })
+    }
+  }
+  return { sets, cards }
+}
+
+/* The singles of a Cardmarket expansion as custom cards. Products with the same name (the same card in
+   several World Championship decks) become one card, linked to the first of them; online code cards are
+   left out. New products get the next numbers, so existing card codes stay the same. */
+function expansionCards(setId, expansion, cat) {
+  const products = cat?.singles.get(Number(expansion))
+  if (!products) {
+    console.warn(`  custom "${setId}": Cardmarket expansion ${expansion} isn't in the catalogue, so it has no cards`)
+    return []
+  }
+  const first = new Map()
+  for (const p of [...products].sort((a, b) => a.idProduct - b.idProduct)) {
+    if (/code card/i.test(p.name) || first.has(p.name)) continue
+    first.set(p.name, p)
+  }
+  // "name" without the last [ … ] (usually the attacks); "cmName" keeps Cardmarket's full name ("Unown [R] [Reassure | Hidden Power]").
+  return [...first.values()].map((p, i) => ({ n: i + 1, name: p.name.replace(/ \[[^\[\]]*\]$/, ''), cmName: p.name, idProduct: p.idProduct }))
 }
 
 /* Keys for a card's printings, in the form the app looks them up: version + stamps ("holo",
@@ -316,6 +376,7 @@ td,th{text-align:left;padding:4px 8px;border-top:1px solid var(--line);vertical-
 <div><b>${stats.changedFromTcgdex}</b>differ from TCGdex</div>
 <div><b>${stats.toCheck}</b>to check</div>
 ${stats.byOverride ? `<div><b>${stats.byOverride}</b>your overrides</div>` : ''}
+${stats.byCustom ? `<div><b>${stats.byCustom}</b>your own cards (not in TCGdex)</div>` : ''}
 </div>
 <p class="muted">To change a link yourself, add it to <code>mapping/overrides.json</code> (create it if it isn't there) and run <code>npm run mapping</code> again:
 <code>{ "sm1-24": 294121, "base1-58": null }</code>. A number links that product, <code>null</code> removes the link.</p>
