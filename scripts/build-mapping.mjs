@@ -151,7 +151,7 @@ async function main() {
   }
   // 4: your own decisions in mapping/overrides.json win: { "sm1-24": 294121, "base1-58": null }
   for (const [id, product] of Object.entries(overrides)) {
-    if (id.startsWith('_') || id === 'sets' || id === 'custom') continue   // "_comment" keys; "sets": chooseExpansion; "custom": step 5
+    if (id.startsWith('_') || id === 'sets' || id === 'custom' || id === 'logos') continue   // "_comment" keys; "sets": chooseExpansion; "custom": step 5; "logos": passed on as is
     if (product == null) link.delete(id)
     else link.set(id, { idProduct: Number(product), how: 'override' })
   }
@@ -209,6 +209,7 @@ async function main() {
     variants,
     sets: setsOut,
     custom: customOut,
+    logos: overrides.logos || {},
   })
   manifest.mappingVersion = version
   manifest.mapping = { ...stats, updatedAt: version }
