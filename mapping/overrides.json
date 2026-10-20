@@ -14,5 +14,58 @@
     "tk-xy-p": 1707,
     "tk-xy-su": 1707
   },
-  "miscp-001": 275577
+  "miscp-001": 275577,
+  "_custom": "\"custom\": cards TCGdex doesn't have, such as Japan's Premium File promos. Each set becomes card codes <lang>:<set>-<n> (ja:pf2-3) linked to the given Cardmarket idProduct. \"variant\": \"reverse\" = Cardmarket keeps its price in the -holo fields.",
+  "custom": {
+    "pf1": {
+      "lang": "ja",
+      "name": "Premium File",
+      "nameJa": "プレミアムファイル",
+      "released": "1999-12-10",
+      "cards": [
+        { "n": 1, "name": "Chikorita", "dexId": 152, "idProduct": 654110 },
+        { "n": 2, "name": "Bayleef", "dexId": 153, "idProduct": 654111 },
+        { "n": 3, "name": "Meganium", "dexId": 154, "idProduct": 654112 },
+        { "n": 4, "name": "Cyndaquil", "dexId": 155, "idProduct": 654113 },
+        { "n": 5, "name": "Quilava", "dexId": 156, "idProduct": 654114 },
+        { "n": 6, "name": "Typhlosion", "dexId": 157, "idProduct": 654115 },
+        { "n": 7, "name": "Totodile", "dexId": 158, "idProduct": 654116 },
+        { "n": 8, "name": "Croconaw", "dexId": 159, "idProduct": 654117 },
+        { "n": 9, "name": "Feraligatr", "dexId": 160, "idProduct": 654118 }
+      ]
+    },
+    "pf2": {
+      "lang": "ja",
+      "name": "Premium File 2",
+      "nameJa": "プレミアムファイル2",
+      "released": "2000-07-07",
+      "cards": [
+        { "n": 1, "name": "Charizard", "dexId": 6, "idProduct": 559931, "variant": "reverse" },
+        { "n": 2, "name": "Entei", "dexId": 244, "idProduct": 571909, "variant": "reverse" },
+        { "n": 3, "name": "Pichu", "dexId": 172, "idProduct": 571910, "variant": "reverse" },
+        { "n": 4, "name": "Espeon", "dexId": 196, "idProduct": 654122 },
+        { "n": 5, "name": "Unown [E]", "dexId": 201, "idProduct": 654120 },
+        { "n": 6, "name": "Unown [N]", "dexId": 201, "idProduct": 654119 },
+        { "n": 7, "name": "Unown [O]", "dexId": 201, "idProduct": 654121 },
+        { "n": 8, "name": "Umbreon", "dexId": 197, "idProduct": 650580 },
+        { "n": 9, "name": "Eevee", "dexId": 133, "idProduct": 571911 }
+      ]
+    },
+    "pf3": {
+      "lang": "ja",
+      "name": "Premium File 3",
+      "nameJa": "プレミアムファイル3",
+      "cards": [
+        { "n": 1, "name": "Celebi", "dexId": 251, "idProduct": 654124 },
+        { "n": 2, "name": "Entei", "dexId": 244, "idProduct": 654127 },
+        { "n": 3, "name": "Suicune", "dexId": 245, "idProduct": 654128 },
+        { "n": 4, "name": "Raikou", "dexId": 243, "idProduct": 654126 },
+        { "n": 5, "name": "Lugia", "dexId": 249, "idProduct": 654130 },
+        { "n": 6, "name": "Sudowoodo", "dexId": 185, "idProduct": 654123 },
+        { "n": 7, "name": "Skarmory", "dexId": 227, "idProduct": 654131 },
+        { "n": 8, "name": "Sneasel", "dexId": 215, "idProduct": 654125 },
+        { "n": 9, "name": "Ho-Oh", "dexId": 250, "idProduct": 654129 }
+      ]
+    }
+  }
 }
