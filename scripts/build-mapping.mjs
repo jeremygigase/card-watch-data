@@ -156,10 +156,10 @@ async function main() {
     else link.set(id, { idProduct: Number(product), how: 'override' })
   }
   // 5: cards TCGdex doesn't have at all (mapping/overrides.json "custom"), such as Japan's Premium File promos.
-  const custom = customCards(overrides.custom)
+  const custom = customCards(overrides.custom, cat)
   used.clear()
   for (const l of link.values()) used.add(l.idProduct)
-  for (const c of custom.cards) used.add(c.idProduct)
+  for (const c of custom.cards) if (c.idProduct != null) used.add(c.idProduct)
   for (const [exp, list] of leftovers) leftovers.set(exp, list.filter(p => !used.has(p.idProduct)))
 
   // Output, same shape as before plus idMetacard and how each link was found.
@@ -190,10 +190,11 @@ async function main() {
 
   const customOut = { sets: custom.sets, cards: {} }
   for (const c of custom.cards) {
+    customOut.cards[c.id] = c.info
+    if (c.idProduct == null) continue            // listed for the set, but Cardmarket has no product: no price
     const p = cat.info.get(c.idProduct)
     if (!p) { stats.unknownToCatalogue++; console.warn(`  custom card ${c.id}: product ${c.idProduct} isn't in the catalogue`) }
     cards[c.id] = [c.idProduct, bucketOf(c.idProduct, p?.idExpansion), p?.idMetacard ?? null, 'custom']
-    customOut.cards[c.id] = c.info
     stats.byCustom++
   }
 
@@ -236,24 +237,46 @@ async function main() {
 /* Cards TCGdex doesn't have, from mapping/overrides.json "custom":
      { "pf2": { "lang": "ja", "name": "Premium File 2", "cards": [{ "n": 3, "name": "Pichu", "idProduct": 571910 }, …] } }
    Each card gets the code "<lang>:<set>-<n>" ("ja:pf2-3"), the form the app uses for non-English cards
-   ("<set>-<n>" for English). Everything but idProduct is passed on to the app as the card's details. */
-function customCards(spec = {}) {
+   ("<set>-<n>" for English). Everything but idProduct is passed on to the app as the card's details.
+   "idProduct": null lists a card that Cardmarket has no product for: it's in the set, without a price.
+   A set with "expansion" instead of "cards" is built from that Cardmarket expansion: one card per product
+   name, numbered in product order and linked to the first product with that name (see expansionCards). */
+function customCards(spec = {}, cat) {
   const sets = {}, cards = [], seen = new Set()
   for (const [setId, s] of Object.entries(spec)) {
     if (setId.startsWith('_')) continue
-    const { cards: list = [], ...info } = s
+    const { cards: given, expansion, ...info } = s
+    const list = given ?? expansionCards(setId, expansion, cat)
     const prefix = info.lang && info.lang !== 'en' ? `${info.lang}:` : ''
     sets[setId] = { ...info, total: list.length }
     for (const c of list) {
       const { idProduct, ...rest } = c
       const id = `${prefix}${setId}-${c.n}`
-      if (c.n == null || !Number.isInteger(Number(idProduct))) throw new Error(`mapping/overrides.json custom "${setId}": every card needs "n" and a numeric "idProduct" (${JSON.stringify(c)})`)
+      if (c.n == null || (idProduct !== null && !Number.isInteger(Number(idProduct)))) throw new Error(`mapping/overrides.json custom "${setId}": every card needs "n" and an "idProduct" (a number, or null when Cardmarket has none) (${JSON.stringify(c)})`)
       if (seen.has(id)) throw new Error(`mapping/overrides.json custom: ${id} appears twice`)
       seen.add(id)
-      cards.push({ id, idProduct: Number(idProduct), info: { set: setId, ...rest } })
+      cards.push({ id, idProduct: idProduct === null ? null : Number(idProduct), info: { set: setId, ...rest } })
     }
   }
   return { sets, cards }
+}
+
+/* The singles of a Cardmarket expansion as custom cards. Products with the same name (the same card in
+   several World Championship decks) become one card, linked to the first of them; online code cards are
+   left out. New products get the next numbers, so existing card codes stay the same. */
+function expansionCards(setId, expansion, cat) {
+  const products = cat?.singles.get(Number(expansion))
+  if (!products) {
+    console.warn(`  custom "${setId}": Cardmarket expansion ${expansion} isn't in the catalogue, so it has no cards`)
+    return []
+  }
+  const first = new Map()
+  for (const p of [...products].sort((a, b) => a.idProduct - b.idProduct)) {
+    if (/code card/i.test(p.name) || first.has(p.name)) continue
+    first.set(p.name, p)
+  }
+  // "name" without the last [ … ] (usually the attacks); "cmName" keeps Cardmarket's full name ("Unown [R] [Reassure | Hidden Power]").
+  return [...first.values()].map((p, i) => ({ n: i + 1, name: p.name.replace(/ \[[^\[\]]*\]$/, ''), cmName: p.name, idProduct: p.idProduct }))
 }
 
 /* Keys for a card's printings, in the form the app looks them up: version + stamps ("holo",
