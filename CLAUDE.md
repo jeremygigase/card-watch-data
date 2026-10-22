@@ -117,6 +117,8 @@ scripts/mapping-lib.mjs    parses TCGdex card .ts files; rebucketMapping()
 scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalogue order + name/attacks
 scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
                            without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
+scripts/build-japanese.mjs weekly job and local tool (npm run japanese): writes ja/cards.json from TCGplayer's Japanese
+                           catalogue (tcgcsv.com, category 85; needs a descriptive User-Agent) + TCGdex /v2/ja; applies mapping/ja-sets.json
 scripts/commit-data.sh     commits the data as ONE orphan commit + force push (keeps the repo small); refuses any branch but `data`
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
                                manual input "rebuild" downloads all archive releases and runs rebuild-history
@@ -147,6 +149,7 @@ Locally: `git worktree add data data` (ignored on main), then `npm run prices` /
   - `mapping/overrides.json` `logos: {tcgdexSetId: imageUrl}` gives sets TCGdex has no logo for one (McDonald's Collections 2011–2022, from pokemontcg.io); it is copied as is into `cards.json` `logos`, and the app uses it as `SetInfo.logo` (`setLogoOverrides` in `lib/tcgdex.ts`).
   - `mapping/overrides.json` `sets: {tcgdexSetId: idExpansion}` places sets TCGdex gives no Cardmarket link (np → 1608, bwp → 1611, sma → 2514 with Hidden Fates, tk-xy-* → 1631/1632/1683/1707).
   - Why: TCGdex gives holo and non-holo printings of old cards the same Cardmarket id; Cardmarket has one product per printing, created in card-number order.
+- **`ja/cards.json`:** `{version, fields: [productId, name, groupId, number, rarity, category, type, dexId], rows, groupFields: [groupId, name, publishedOn, tcgdexSetId, official], groups, art: {tcgdexJaId: productId}}`. `rows` = Japanese cards TCGdex doesn't have (English names from TCGplayer, one per group + number, pattern versions folded in; `category`/`type` as TCGdex writes them, `dexId` from the name via PokéAPI, 0 for none); `art` = TCGplayer's picture for TCGdex Japanese cards without one. Groups link to TCGdex sets by set code, else `mapping/ja-sets.json` (groupId or null); in linked sets cards pair by number, unnumbered vintage cards by Pokémon name (PokéAPI's `pokemon_species_names.csv`). `manifest.japaneseVersion`/`manifest.japanese` (stats). About 1.2 MB (270 KB gzipped); 15,100 rows, 12,300 paired, 8,400 pictures lent.
 - **`catalog/products.json`:** `{fields: [idProduct, name, idExpansion, idCategory, categoryName, idMetacard, dateAdded], rows}`
 - **File names** ("buckets"): `e<idExpansion>`, or `x<idProduct % 50>` for products without an expansion.
 - **Day labels:** a guide's day is the Belgian date of its `createdAt` (e.g. `2026-10-14T02:53:25+0200` → `2026-10-14`).

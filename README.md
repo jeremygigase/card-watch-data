@@ -29,12 +29,14 @@ history/<YYYY-MM>/e<exp>.json all prices per product, only on days they changed 
 weekly/<YYYY-MM>/e<exp>.json  older months, rolled up into weekly averages
 catalog/products.json         every Pokémon product: id, name, expansion, category
 mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name, metacard id, how it was found]
+ja/cards.json                 Japanese cards TCGdex doesn't have (TCGplayer's catalogue), and TCGplayer pictures for TCGdex's
 ```
 
 On `main`:
 
 ```
 mapping/overrides.json        your own fixes to the mapping (card code -> product id, or null; set -> expansion)
+mapping/ja-sets.json          TCGdex Japanese set -> TCGplayer group, for sets the set code doesn't link (see "Japanese cards")
 scripts/                      the jobs (Node 20, no dependencies); they read and write the data in the current folder
 .github/workflows/            daily prices, weekly mapping; they check out main for the code and data into data/
 ```
@@ -131,6 +133,26 @@ Cardmarket link (the Nintendo, BW and Shiny Vault promos, the XY trainer kits); 
 Commit `mapping/overrides.json` to `main` (through a pull request), then run Actions → **Weekly card mapping**
 to publish the new mapping. The weekly job runs the same script with the same overrides, so it keeps your choices.
 
+## Japanese cards
+
+TCGdex's Japanese database is small (about 13,000 cards, most without a picture, no McDonald's or most promos).
+`scripts/build-japanese.mjs` (`npm run japanese`, also run by the weekly mapping job) adds TCGplayer's Japanese
+catalogue from [TCGCSV](https://tcgcsv.com) (category 85, a free daily copy of TCGplayer's catalogue; it wants a
+descriptive User-Agent). It writes `ja/cards.json`:
+
+```
+{ version, fields: [productId, name, groupId, number, rarity, category, type, dexId], rows,
+  groupFields: [groupId, name, publishedOn, tcgdexSetId, official], groups, art: {"PMCG1-023": 575593} }
+```
+
+- Each TCGplayer group is linked to a TCGdex set by set code (`abbreviation`, or a name like `SV2a: …`), else by
+  `mapping/ja-sets.json` (a groupId, or `null` for none). The script lists the sets it couldn't link.
+- In a linked set, a card TCGdex has (same number; for unnumbered vintage cards the same Pokémon name, through
+  PokéAPI's name list) is left out of `rows`, and lends TCGdex its picture through `art` when TCGdex has none.
+- Names are English (TCGplayer's), numbers as printed (`007/165`). `category`/`type` follow TCGdex (`Pokemon` + energy
+  type, `Trainer` + trainer type, `Energy`); `dexId` comes from the Pokémon name (0 when there is none). Pattern versions (Poké Ball, Master Ball,
+  Mirror Holofoil) are folded into one card per number. `manifest.japaneseVersion` changes on every run.
+
 ## Run it on your own computer
 
 The jobs read and write the data in the folder they run in. On `main`, check the `data` branch out into
@@ -141,6 +163,7 @@ git fetch origin data && git worktree add data data
 git -C data fetch origin data && git -C data reset --hard origin/data     # later: get the newest data
 npm run prices -- --force
 npm run mapping
+npm run japanese
 ```
 
 Don't push from `data/`: the jobs replace that branch every day, so publish changes through the workflows.

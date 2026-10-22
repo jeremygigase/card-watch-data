@@ -44,5 +44,8 @@ jobs:
       - name: Link TCGdex cards to Cardmarket products
         run: node ../scripts/build-mapping.mjs "$RUNNER_TEMP/tcgdex"
 
+      - name: Japanese cards TCGdex doesn't have (TCGplayer's catalogue via TCGCSV)
+        run: node ../scripts/build-japanese.mjs
+
       - name: Save the data
         run: bash ../scripts/commit-data.sh "Card mapping of $(date -u +%Y-%m-%d)"
