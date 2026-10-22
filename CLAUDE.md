@@ -6,7 +6,7 @@ Two projects that work together:
 | Folder | What it is | Runs where |
 |---|---|---|
 | `cardwatch-web/` | The app. Plain HTML, CSS and JavaScript, no framework, no build step. Installable (PWA). | Any static host (plan: Bunny), or `python3 -m http.server` locally |
-| `card-watch-data/` | Your own price database: nightly job that stores Cardmarket's full Pokémon price guide plus history. | GitHub repository + GitHub Actions + GitHub Pages |
+| `card-watch-data/` | Your own price database: nightly job that stores Cardmarket's full Pokémon price guide plus history. | Private GitHub repository + GitHub Actions + Netlify (signed-in users only) |
 
 Status (14 Oct 2026): both built and tested with simulated data. **Not yet deployed.**
 Nothing has run against the live Cardmarket download server or real GitHub Actions yet.
@@ -21,7 +21,7 @@ Cardmarket downloads (price guide + catalogue, daily, ~80k Pokémon products)
         ▼
 card-watch-data  (GitHub Actions, nightly)
   latest/<set>.json · history/<YYYY-MM>/<set>.json · mapping/cards.json · manifest.json
-        │  GitHub Pages (static JSON, CORS *)
+        │  Netlify (static JSON behind an edge function: Supabase sign-in required, CORS for the app only)
         ▼
 cardwatch-web  (browser, IndexedDB)
   reads manifest → mapping → only the set files for the user's cards
@@ -121,18 +121,21 @@ scripts/commit-data.sh     commits the data as ONE orphan commit + force push (k
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
                                manual input "rebuild" downloads all archive releases and runs rebuild-history
 .github/workflows/mapping.yml  Mondays 03:00 UTC; sparse-clones tcgdex/cards-database data/
+.github/workflows/deploy.yml   manual, or on main changes to netlify/**: publishes the data branch to Netlify
+scripts/deploy-netlify.sh  copies data/ (minus .git, archive, .cache) and runs `netlify deploy --prod`; prices/mapping call it when commit-data.sh pushed
+netlify/edge-functions/require-login.ts  every request needs a valid Supabase access token (JWKS, or SUPABASE_JWT_SECRET for HS256); CORS only for ALLOWED_ORIGINS
 ```
 
 Both workflows share the concurrency group `card-watch-data`, so they never run at the same time.
 
 **Two branches:** `main` holds the code (scripts, workflows, `mapping/overrides.json`, docs) with a normal history, so feature
 branches and pull requests work. `data` holds the generated files (`manifest.json`, `latest/`, `history/`, `weekly/`, `catalog/`,
-`mapping/cards.json`, `.nojekyll`) and is what GitHub Pages serves; each job run replaces it with a single new commit.
+`mapping/cards.json`, `.nojekyll`) and is what the Netlify site serves (`scripts/deploy-netlify.sh`, after every change); each job run replaces it with a single new commit.
 The workflows check out `main`, then `data` into `data/`, and run `node ../scripts/…` from `data/` (`ROOT = process.cwd()`).
 `build-mapping.mjs` reads `mapping/overrides.json` next to the scripts, not from the data folder.
 Locally: `git worktree add data data` (ignored on main), then `npm run prices` / `npm run mapping`, which `cd data` first.
 
-### Output formats (served by GitHub Pages)
+### Output formats (served by Netlify)
 
 - **`manifest.json`:** `{lastDay, days[], months[], weeklyMonths[], sourceTime, productCount, latestFields, historyFields, weeklyFields, historyVersion, historyBytes{}, mappingVersion, guideEtag, catalog{…}, mapping{stats}}`. `days`/`months` list only the daily history; `historyVersion` 2 = all 12 fields (1 = trend only; the app refetches history when it goes up).
 - **`latest/<file>.json`:** `{day, fields: [low, trend, avg, avg1, avg7, avg30, low-holo, trend-holo, avg-holo, avg1-holo, avg7-holo, avg30-holo], p: {idProduct: [values]}}`
@@ -167,10 +170,10 @@ Locally: `git worktree add data data` (ignored on main), then `npm run prices` /
 Deployment, in this order:
 1. Create the `card-watch-data` GitHub repository and upload the folder, including `.github/` and `.nojekyll`.
 2. Settings → Actions → General → Workflow permissions → **Read and write permissions**.
-3. Settings → Pages → deploy from branch `data`, folder `/` (root). (Create `data` first: an orphan branch with `.nojekyll`.)
+3. Netlify: a manually deployed project with env `SUPABASE_URL` and `ALLOWED_ORIGINS`; GitHub secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` (see README step 4). (Create `data` first: an orphan branch with `.nojekyll`.)
 4. Run **Daily prices** once, then **Weekly card mapping** once.
 5. Upload `cardwatch-web` to Bunny.
-6. In the app, enter the Pages address under **Data → Daily prices**.
+6. Build the app with `VITE_PRICE_DATA_URL` = the Netlify address, then make this repository private.
 
 Unverified against the real thing:
 - **The download server.** The Cardmarket download server's ETag/HEAD behaviour; the script handles a missing ETag by processing anyway.
@@ -181,7 +184,7 @@ Known limitations:
 - **Prices aren't split by language or condition.** It's a limit of the source data.
 - **About 14% of TCGdex cards have no Cardmarket link** (mostly very new or unusual cards); those fall back to TCGdex prices.
 - **The collection lives per browser and device.** Moving it means backup and restore; there's no sync.
-- **GitHub Pages on a free account means a public repository**, so the full price guide becomes publicly readable. Check Cardmarket's terms before sharing the app with others.
+- **The data is only served to signed-in users** (`netlify/edge-functions/require-login.ts` checks the Supabase access token). A signed-in user can still copy it. Check Cardmarket's terms before sharing the app with others.
 - **Long-term size:** months older than 90 days are rolled into weekly averages; after several years `weekly/` may need a monthly roll-up (same `rollupSeries`, bigger buckets). The release archive keeps the originals.
 
 Feature ideas, roughly in order:

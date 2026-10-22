@@ -6,8 +6,8 @@ Every night a GitHub Action downloads Cardmarket's public price guide and produc
 (one download each, all ~80,000 Pokémon products, singles and sealed), stores today's prices,
 and adds the day to the price history. Once a week it links TCGdex card codes (`neo1-6`) to
 Cardmarket products (`274406`), using the order of Cardmarket's own catalogue and TCGdex's open card database
-(see "The card mapping" below). GitHub Pages serves the files,
-so the app (and anyone you give the address to) reads prices from here instead of calling an API per card.
+(see "The card mapping" below). A Netlify site serves the files, only to people signed in to Card Watch,
+so the app reads prices from here instead of calling an API per card.
 
 History starts on the day you set this up; Cardmarket doesn't offer older days.
 
@@ -17,7 +17,7 @@ The repository has two branches:
 
 - **`main`**: the code (`scripts/`, the workflows, `mapping/overrides.json`, this README), with a normal history.
   Work on it with branches and pull requests as usual.
-- **`data`**: the generated files below, which GitHub Pages serves. The jobs replace this branch with a single
+- **`data`**: the generated files below, which the Netlify site serves. The jobs replace this branch with a single
   new commit on every run (see "Size"), so never branch off it or open pull requests against it.
 
 On the `data` branch:
@@ -66,16 +66,29 @@ so you can rebuild or extend the history later (for example with fields this rep
    git add .nojekyll .gitignore && git commit -m "Empty data" && git push origin data && git switch main
    ```
 3. **Let the jobs save data:** Settings → Actions → General → Workflow permissions → **Read and write permissions** → Save.
-4. **Publish it:** Settings → Pages → Source: **Deploy from a branch**, branch `data`, folder `/ (root)` → Save.
-   Your address will be `https://<your-github-name>.github.io/card-watch-data/`.
+4. **Publish it on Netlify** (signed-in users only):
+   - Netlify → Add new project → **Deploy manually** (no Git link; the workflows deploy). Note its address
+     (`https://<name>.netlify.app`) and its **Project ID** (Project configuration → General).
+   - Project configuration → Environment variables: `SUPABASE_URL` = the app's Supabase project URL, and
+     `ALLOWED_ORIGINS` = the app's addresses, comma separated (for example `https://cardwatch.netlify.app,http://localhost:8080`).
+   - User settings → Applications → **Personal access tokens** → New token.
+   - GitHub: Settings → Secrets and variables → Actions → add `NETLIFY_AUTH_TOKEN` (the token) and `NETLIFY_SITE_ID` (the Project ID).
+   - Supabase: Project Settings → JWT Keys → use **JWT signing keys** (the sign-in check reads the public keys).
+     If you keep the legacy secret, add it to Netlify as `SUPABASE_JWT_SECRET` instead.
 5. **First run:** Actions → **Daily prices** → Run workflow. Wait for it to finish (a few minutes).
 6. **Then:** Actions → **Weekly card mapping** → Run workflow.
-7. **Connect the app:** in Card Watch, open **Data → Daily prices**, paste the address from step 4, press **Save and test**.
+7. **Connect the app:** build Card Watch with `VITE_PRICE_DATA_URL` = the Netlify address from step 4.
+8. **Make the repository private:** Settings → General → Danger zone → Change visibility. The archive releases
+   become private too; the workflows keep working.
 
 After that it runs by itself: prices every night around 03:30 Belgian time (with a second try at 09:30),
 the mapping every Monday.
 
-GitHub Pages needs a public repository on a free account. A private repository with Pages needs a paid plan.
+Every request to the Netlify site goes through `netlify/edge-functions/require-login.ts`: it needs a valid Card Watch
+sign-in (the user's Supabase access token) and answers browsers only from the addresses in `ALLOWED_ORIGINS`.
+Without a sign-in it answers 401. A signed-in user can still read every file, so this stops anonymous access,
+not a user who copies the data. The **Deploy to Netlify** workflow publishes by hand, and runs by itself when
+the sign-in check changes on `main`. Netlify counts each production deploy and the bandwidth against your plan.
 
 ## Size
 
@@ -93,8 +106,7 @@ When it gets large after a few years, move old `history/` months elsewhere; the 
 
 Cardmarket publishes these files for download, but its announcement doesn't spell out how the data may be reused.
 Using it for yourself is one thing; before you open this up to other people or use it commercially,
-check Cardmarket's terms or ask them. Keeping this repository private is not possible with free GitHub Pages,
-so the files are publicly readable.
+check Cardmarket's terms or ask them. The repository is private and the files are only served to signed-in users.
 
 ## The card mapping
 

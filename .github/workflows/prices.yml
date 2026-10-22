@@ -75,4 +75,13 @@ jobs:
           node ../scripts/rebuild-history.mjs .cache/archive
 
       - name: Save the data (one commit on the data branch, so the repository stays small)
+        id: save
         run: bash ../scripts/commit-data.sh "Prices of $(node -p "require('./manifest.json').lastDay")"
+
+      - name: Publish to Netlify (only signed-in Card Watch users can read it)
+        if: steps.save.outputs.changed == 'true'
+        working-directory: .
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: bash scripts/deploy-netlify.sh "Prices"

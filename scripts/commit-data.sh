@@ -18,6 +18,7 @@ git config user.email "actions@users.noreply.github.com"
 git add -A
 if git diff --cached --quiet; then
   echo "Nothing changed."
+  [ -n "${GITHUB_OUTPUT:-}" ] && echo "changed=false" >> "$GITHUB_OUTPUT"
   exit 0
 fi
 
@@ -27,3 +28,5 @@ git branch -D "$branch" >/dev/null
 git branch -m "$branch"
 git push --force origin "$branch"
 echo "Pushed: $message"
+[ -n "${GITHUB_OUTPUT:-}" ] && echo "changed=true" >> "$GITHUB_OUTPUT"
+exit 0
