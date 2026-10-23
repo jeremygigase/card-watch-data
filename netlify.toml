@@ -1,0 +1,6 @@
+# The price data site. Nothing is built: the workflows deploy the `data` branch with scripts/deploy-netlify.sh.
+# Every request goes through netlify/edge-functions/require-login.ts (signed-in Card Watch users only;
+# the function declares its own path, /*).
+[build]
+  publish = "data"
+  edge_functions = "netlify/edge-functions"

@@ -1,0 +1,46 @@
+name: Deploy to Netlify
+
+# The daily and weekly jobs publish after every change to the data. This one publishes the current data
+# by hand, or when the sign-in check (the edge function) or the Netlify settings change on main.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/**'
+      - 'netlify.toml'
+      - 'scripts/deploy-netlify.sh'
+
+concurrency:
+  group: card-watch-data          # never at the same time as the jobs that change the data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Get the code (main)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get the data (data branch)
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publish to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: bash scripts/deploy-netlify.sh "Manual deploy"
