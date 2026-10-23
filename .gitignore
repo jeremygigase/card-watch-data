@@ -18,3 +18,4 @@ node_modules/
 # Local mapping run: TCGdex download and the review page
 .cache/
 mapping-report.html
+.netlify/
