@@ -118,12 +118,17 @@ scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalo
 scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
                            without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
 scripts/commit-data.sh     commits the data as ONE orphan commit + force push (keeps the repo small); refuses any branch but `data`
+site/inspector.html        price data inspector (no build): per card its mapping, TCGdex printings, every candidate product
+                           (same metacard / same name in the set) with all 12 latest fields and history. deploy-netlify.sh
+                           publishes it at <Netlify>/inspector.html; it signs in (Supabase) and only goes on for OWNER_EMAILS;
+                           `?data=<url>` reads another copy of the data
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
                                manual input "rebuild" downloads all archive releases and runs rebuild-history
 .github/workflows/mapping.yml  Mondays 03:00 UTC; sparse-clones tcgdex/cards-database data/
 .github/workflows/deploy.yml   manual, or on main changes to netlify/**: publishes the data branch to Netlify
-scripts/deploy-netlify.sh  copies data/ (minus .git, archive, .cache) and runs `netlify deploy --prod`; prices/mapping call it when commit-data.sh pushed
-netlify/edge-functions/require-login.ts  every request needs a valid Supabase access token (JWKS, or SUPABASE_JWT_SECRET for HS256); CORS only for ALLOWED_ORIGINS
+scripts/deploy-netlify.sh  copies data/ (minus .git, archive, .cache) plus site/*.html and runs `netlify deploy --prod`; prices/mapping call it when commit-data.sh pushed
+netlify/edge-functions/require-login.ts  every request needs a valid Supabase access token (JWKS, or SUPABASE_JWT_SECRET for HS256); CORS only for ALLOWED_ORIGINS;
+                           except /inspector.html (excludedPath) and /inspector-config.json; /inspector-access answers 200 only for OWNER_EMAILS
 ```
 
 Both workflows share the concurrency group `card-watch-data`, so they never run at the same time.
@@ -170,7 +175,7 @@ Locally: `git worktree add data data` (ignored on main), then `npm run prices` /
 Deployment, in this order:
 1. Create the `card-watch-data` GitHub repository and upload the folder, including `.github/` and `.nojekyll`.
 2. Settings → Actions → General → Workflow permissions → **Read and write permissions**.
-3. Netlify: a manually deployed project with env `SUPABASE_URL` and `ALLOWED_ORIGINS`; GitHub secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` (see README step 4). (Create `data` first: an orphan branch with `.nojekyll`.)
+3. Netlify: a manually deployed project with env `SUPABASE_URL` and `ALLOWED_ORIGINS` (plus `SUPABASE_PUBLISHABLE_KEY` and `OWNER_EMAILS` for the inspector); GitHub secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` (see README step 4). (Create `data` first: an orphan branch with `.nojekyll`.)
 4. Run **Daily prices** once, then **Weekly card mapping** once.
 5. Upload `cardwatch-web` to Bunny.
 6. Build the app with `VITE_PRICE_DATA_URL` = the Netlify address, then make this repository private.

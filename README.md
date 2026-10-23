@@ -71,6 +71,8 @@ so you can rebuild or extend the history later (for example with fields this rep
      (`https://<name>.netlify.app`) and its **Project ID** (Project configuration → General).
    - Project configuration → Environment variables: `SUPABASE_URL` = the app's Supabase project URL, and
      `ALLOWED_ORIGINS` = the app's addresses, comma separated (for example `https://cardwatch.netlify.app,http://localhost:8080`).
+     For the inspector (below) also `SUPABASE_PUBLISHABLE_KEY` = the app's publishable key, and `OWNER_EMAILS` = the
+     Card Watch accounts that may use it, comma separated.
    - User settings → Applications → **Personal access tokens** → New token.
    - GitHub: Settings → Secrets and variables → Actions → add `NETLIFY_AUTH_TOKEN` (the token) and `NETLIFY_SITE_ID` (the Project ID).
    - Supabase: Project Settings → JWT Keys → use **JWT signing keys** (the sign-in check reads the public keys).
@@ -142,6 +144,13 @@ A number links that product; `null` removes the link (the app then has no price 
 Cardmarket link (the Nintendo, BW and Shiny Vault promos, the XY trainer kits); the matching then runs as usual.
 Commit `mapping/overrides.json` to `main` (through a pull request), then run Actions → **Weekly card mapping**
 to publish the new mapping. The weekly job runs the same script with the same overrides, so it keeps your choices.
+
+To see what the price data holds for one card, open `https://<name>.netlify.app/inspector.html` (`site/inspector.html`,
+published with the data) and type a card code (`neo2-5`), a product id or a name. It shows the card's mapping, TCGdex's
+printings, every product that could be it (same metacard, or same name in the set) with all 12 latest fields and the history.
+It asks you to sign in with your Card Watch account and only goes on for the accounts in `OWNER_EMAILS`; anyone else sees
+the sign-in form and nothing more. (Other signed-in app users can still read the data files themselves, as the app does.)
+Opened elsewhere (say `http://localhost:8090`), it reads the data at `?data=<url>`, and that local address must be in `ALLOWED_ORIGINS`.
 
 ## Run it on your own computer
 

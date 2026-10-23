@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Price data inspector</title>
+<!-- Shows what the price data holds for one card: its mapping, every Cardmarket product that could be it
+     (same metacard or same name in the set), each product's latest prices (all 12 fields) and its history.
+     Copied onto the data branch by scripts/commit-data.sh, so GitHub Pages serves it next to the JSON files.
+     ?data=<url> reads another copy of the price data. Where the data needs a sign-in (Netlify, see
+     netlify/edge-functions/require-login.ts), the page signs in with a Card Watch account and only goes on for
+     the accounts in OWNER_EMAILS. -->
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1b;--muted:#6b6b66;--line:#e2e1dc;--card:#fff;--warn:#9a5b00;--warnbg:#fff3df;--bad:#a1271b;--badbg:#fde8e5;--ok:#2b6b2f;--okbg:#e6f3e4;--c1:#2a6fdb;--c2:#c2410c;--hi:#2a6fdb}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--muted:#9c9b94;--line:#33322f;--card:#1f1f1d;--warn:#f0b35a;--warnbg:#3a2a12;--bad:#f08b7f;--badbg:#3d1c18;--ok:#8fd18f;--okbg:#1d3320;--c1:#7aa7f0;--c2:#f0955a;--hi:#7aa7f0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:28px 0 8px}h3{font-size:16px;margin:0}
+.muted{color:var(--muted)}.id{color:var(--muted);font:12px ui-monospace,Menlo,monospace}
+a{color:var(--hi)}
+form{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+input[type=search],input[type=email],input[type=password]{flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);font:inherit}
+button{padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);font:inherit;cursor:pointer}
+.examples{font-size:13px}.examples a{margin-right:8px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:8px 0}
+.box.mapped{border-color:var(--hi);box-shadow:0 0 0 1px var(--hi)}
+.head{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
+.chips{display:flex;flex-wrap:wrap;gap:4px}.chips span,.chips a{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;text-decoration:none;color:inherit}
+.chips .ok{color:var(--ok);background:var(--okbg);border-color:transparent}.chips .warn{color:var(--warn);background:var(--warnbg);border-color:transparent}.chips .bad{color:var(--bad);background:var(--badbg);border-color:transparent}
+.chips .hi{color:var(--bg);background:var(--hi);border-color:transparent}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{text-align:left;padding:4px 8px;border-top:1px solid var(--line);vertical-align:top;white-space:nowrap}th{font-weight:600;color:var(--muted)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}td.wrap{white-space:normal}
+.null{color:var(--muted)}
+.wrap{overflow-x:auto;margin:8px 0}
+code,pre{font:12px ui-monospace,Menlo,monospace}
+pre{margin:8px 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow-x:auto;white-space:pre}
+details{margin-top:8px}summary{cursor:pointer;color:var(--muted)}
+.tcg{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}.tcg img{width:140px;border-radius:5%;flex:none}.tcg>div{flex:1;min-width:220px}
+.chart{display:block;width:100%;height:auto;margin-top:8px}
+.chart text{fill:var(--muted);font:11px system-ui,sans-serif}.chart .grid{stroke:var(--line)}
+.legend{display:flex;gap:12px;font-size:13px;color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+#status:empty{display:none}
+#login{display:grid;gap:8px;max-width:360px}#login[hidden],#form[hidden],.examples[hidden]{display:none}
+.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>Price data inspector</h1>
+<p class="muted" id="source">Looks up what your price data holds for a card.</p>
+<form id="login" hidden>
+  <p class="muted" style="margin:0">Sign in with your Card Watch account.</p>
+  <input type="email" id="email" placeholder="Email" autocomplete="username" required>
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+  <button>Sign in</button>
+  <p id="loginError" class="err" style="margin:0"></p>
+</form>
+<form id="form">
+  <input type="search" id="q" placeholder="Card code (neo2-5), Cardmarket product id (274516), file (e1532) or name" autocomplete="off">
+  <button>Look up</button>
+</form>
+<p class="examples muted">Try: <a href="#neo2-5">neo2-5</a><a href="#base1-4">base1-4</a><a href="#p274535">274535</a><a href="#e1532">e1532</a><a href="#q=houndour">houndour</a></p>
+<p id="status" class="muted"></p>
+<div id="out"></div>
+</main>
+<script>
+'use strict'
+const DEFAULT_DATA = 'https://jeremygigase.github.io/card-watch-data'
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.109.0/+esm' // same version as the app
+const TCGDEX = 'https://api.tcgdex.net/v2/en/cards/'
+const PLAIN = ['low', 'trend', 'avg', 'avg1', 'avg7', 'avg30']
+const OLD_HISTORY_FIELDS = ['trend', 'trend-holo'] // the first history files kept only these two
+const HOW = {
+  order: 'lined up with the expansion’s products by card number and product id (name and attacks fit)',
+  name: 'the only fitting product left over with that name',
+  tcgdex: 'TCGdex’s own Cardmarket link',
+  override: 'your fix in mapping/overrides.json',
+  custom: 'your own card from mapping/overrides.json (not in TCGdex)',
+}
+const LIMIT = 150
+
+const $ = (s) => document.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+const money = new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR' })
+const num = (v) => (v == null ? '<span class="null">—</span>' : esc(money.format(v)))
+const cmLink = (id) => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${id}`
+const bucketOf = (id, exp) => (exp != null ? `e${exp}` : `x${id % 50}`) // same as scripts/lib.mjs
+const status = (html) => { $('#status').innerHTML = html }
+
+/* ---------- loading ---------- */
+
+let base = null
+let sb = null // Supabase client, only where the data needs a sign-in
+let lastDay = null // the price data's latest day; charts run up to it
+const files = new Map()
+
+/* A JSON file of the price data, fetched once. optional: a missing file gives null instead of an error. */
+function get(path, optional = false) {
+  let f = files.get(path)
+  if (!f) {
+    f = authHeaders().then((headers) => fetch(base + '/' + path, { cache: 'no-cache', headers })).then((r) => {
+      if (r.status === 404 && optional) return null
+      if (r.status === 401) throw new Error('your sign-in has expired; reload the page')
+      if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`)
+      return r.json()
+    })
+    f.catch(() => files.delete(path))
+    files.set(path, f)
+  }
+  return f
+}
+
+async function authHeaders() {
+  if (!sb) return {}
+  const { data } = await sb.auth.getSession() // refreshes an expired token
+  return data.session ? { Authorization: 'Bearer ' + data.session.access_token } : {}
+}
+
+/* ?data=…, else this page's own folder when it serves the price data, else the default address. */
+async function findBase() {
+  const asked = new URLSearchParams(location.search).get('data')
+  if (asked) return new URL(asked, location.href).href.replace(/\/+$/, '')
+  if (location.protocol.startsWith('http')) {
+    const here = new URL('.', location.href).href.replace(/\/+$/, '')
+    for (const file of ['inspector-config.json', 'manifest.json']) {
+      try {
+        if ((await fetch(here + '/' + file, { cache: 'no-cache' })).ok) return here
+      } catch {}
+    }
+  }
+  return DEFAULT_DATA
+}
+
+/* Data behind the sign-in check: sign in, then ask the edge function whether this account is an owner.
+   Resolves once it is; a refused account is signed out and the form asks again. */
+async function signIn(cfg) {
+  const { createClient } = await import(SUPABASE_JS)
+  sb = createClient(cfg.supabaseUrl, cfg.publishableKey)
+  let message = ''
+  for (;;) {
+    let { data: { session } } = await sb.auth.getSession()
+    if (!session) session = await askLogin(message)
+    const r = await fetch(base + '/inspector-access', { cache: 'no-store', headers: { Authorization: 'Bearer ' + session.access_token } })
+    if (r.ok) break
+    if (r.status !== 401 && r.status !== 403) throw new Error('inspector-access: HTTP ' + r.status)
+    await sb.auth.signOut()
+    message = r.status === 403 ? 'That account may not use the inspector.' : 'Your sign-in has expired. Sign in again.'
+  }
+  const { data } = await sb.auth.getUser()
+  return data.user?.email ?? ''
+}
+
+function askLogin(message) {
+  $('#form').hidden = $('.examples').hidden = true
+  $('#login').hidden = false
+  $('#loginError').textContent = message
+  status('')
+  return new Promise((resolve) => {
+    $('#login').onsubmit = async (ev) => {
+      ev.preventDefault()
+      $('#loginError').textContent = ''
+      const { data, error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value })
+      if (error) { $('#loginError').textContent = error.message; return }
+      $('#login').hidden = true
+      $('#form').hidden = $('.examples').hidden = false
+      $('#password').value = ''
+      resolve(data.session)
+    }
+  })
+}
+
+let ready = null
+const load = () => (ready ??= loadAll().catch((e) => { ready = null; throw e }))
+
+async function loadAll() {
+  base = await findBase()
+  const cfg = await get('inspector-config.json', true).catch(() => null)
+  const who = cfg?.supabaseUrl ? await signIn(cfg) : null
+  status('Loading manifest, mapping and catalogue (about 9 MB) …')
+  const [manifest, map, cat] = await Promise.all([get('manifest.json'), get('mapping/cards.json'), get('catalog/products.json')])
+  lastDay = manifest.lastDay
+  const D = { manifest, map, products: new Map(), byMeta: new Map(), byExp: new Map(), mappedBy: new Map(), setsOfExp: new Map() }
+
+  const f = Object.fromEntries(cat.fields.map((k, i) => [k, i]))
+  for (const r of cat.rows) {
+    const p = { id: r[f.idProduct], name: r[f.name], exp: r[f.idExpansion], cat: r[f.categoryName], meta: r[f.idMetacard], added: r[f.dateAdded], row: r }
+    p.file = bucketOf(p.id, p.exp)
+    D.products.set(p.id, p)
+    if (p.meta) push(D.byMeta, p.meta, p)
+    push(D.byExp, p.file, p)
+  }
+  D.catFields = cat.fields
+
+  const iId = map.fields.indexOf('idProduct')
+  for (const [card, e] of Object.entries(map.cards)) if (e[iId] != null) push(D.mappedBy, e[iId], { card })
+  for (const [card, vs] of Object.entries(map.variants || {}))
+    for (const [key, id] of Object.entries(vs)) push(D.mappedBy, id, { card, key })
+  for (const [set, exp] of Object.entries(map.sets || {})) push(D.setsOfExp, 'e' + exp, set)
+
+  $('#source').innerHTML = `Data from <a href="${esc(base)}/manifest.json">${esc(base)}</a> · prices of <b>${esc(manifest.lastDay)}</b> ·
+    mapping of ${esc((manifest.mappingVersion || map.version || '').slice(0, 10))} · ${D.products.size.toLocaleString('en-GB')} products${
+    who != null ? ` · ${esc(who)} · <a href="#" id="signout">Sign out</a>` : ''}`
+  if (who != null) $('#signout').onclick = (ev) => { ev.preventDefault(); sb.auth.signOut().then(() => location.reload()) }
+  status('')
+  return D
+}
+
+function push(m, k, v) {
+  const a = m.get(k)
+  if (a) a.push(v)
+  else m.set(k, [v])
+}
+
+/* Today's 12 fields of a product, as {field: value}. undefined = not in today's price guide. */
+async function latestOf(id, file) {
+  const f = await get(`latest/${file}.json`, true)
+  const row = f?.p[id]
+  if (!row) return { day: f?.day, row: undefined, values: undefined }
+  return { day: f.day, row, values: Object.fromEntries(f.fields.map((k, i) => [k, row[i] ?? null])) }
+}
+
+/* Every stored history point of a product, oldest first: daily months and the weekly roll-ups. */
+async function historyOf(D, id, file) {
+  const m = D.manifest
+  const parts = [
+    ...(m.weeklyMonths || []).map((mo) => ({ path: `weekly/${mo}/${file}.json`, period: 'week' })),
+    ...(m.months || []).map((mo) => ({ path: `history/${mo}/${file}.json`, period: 'day' })),
+  ]
+  const got = await Promise.all(parts.map((p) => get(p.path, true).then((f) => ({ ...p, f }), () => ({ ...p, f: null }))))
+  const points = [], raw = []
+  for (const { path, period, f } of got) {
+    const rows = f?.p[id]
+    if (!rows) continue
+    const fields = f.fields || OLD_HISTORY_FIELDS
+    raw.push({ file: path, fields, points: rows })
+    for (const [day, ...vals] of rows)
+      points.push({ day, period, empty: vals.length === 0, values: Object.fromEntries(fields.map((k, i) => [k, vals[i] ?? null])) })
+  }
+  points.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+  return { points, raw }
+}
+
+/* ---------- views ---------- */
+
+async function route() {
+  const h = decodeURIComponent(location.hash.slice(1)).trim()
+  $('#q').value = h.startsWith('q=') ? h.slice(2) : h.replace(/^p(?=\d+$)/, '')
+  if (!h) { $('#out').innerHTML = ''; return }
+  let D
+  try { D = await load() } catch (e) { status(`<span class="err">Couldn’t load the price data: ${esc(e.message)}</span>`); return }
+  const out = $('#out')
+  out.innerHTML = '<p class="muted">Loading …</p>'
+  try {
+    if (/^p\d+$/.test(h)) out.innerHTML = await productView(D, +h.slice(1))
+    else if (/^[ex]\d+$/.test(h)) out.innerHTML = await fileView(D, h)
+    else if (h.startsWith('q=')) out.innerHTML = searchView(D, h.slice(2))
+    else if (D.map.cards[h]) out.innerHTML = await cardView(D, h)
+    else out.innerHTML = searchView(D, h)
+  } catch (e) {
+    out.innerHTML = `<p class="err">Something went wrong: ${esc(e.message)}</p>`
+    console.error(e)
+  }
+}
+
+$('#form').addEventListener('submit', async (ev) => {
+  ev.preventDefault()
+  const q = $('#q').value.trim()
+  if (!q) return
+  let D
+  try { D = await load() } catch (e) { status(`<span class="err">Couldn’t load the price data: ${esc(e.message)}</span>`); return }
+  const lower = q.toLowerCase()
+  const next =
+    /^\d+$/.test(q) ? 'p' + q
+    : /^[ex]\d+$/i.test(q) ? lower
+    : D.map.cards[q] ? q
+    : D.map.cards[lower] ? lower
+    : 'q=' + q
+  if (location.hash.slice(1) === encodeURIComponent(next)) route()
+  else location.hash = encodeURIComponent(next)
+})
+window.addEventListener('hashchange', route)
+
+/* One TCGdex card: mapping, TCGdex's printings and every product that could be it. */
+async function cardView(D, id) {
+  const fields = D.map.fields
+  const entry = D.map.cards[id]
+  const e = Object.fromEntries(fields.map((k, i) => [k, entry[i]]))
+  const variants = D.map.variants?.[id]
+  const tcg = id.includes(':') ? { skipped: true } : await fetch(TCGDEX + encodeURIComponent(id)).then((r) => (r.ok ? r.json() : { error: 'HTTP ' + r.status }), (err) => ({ error: err.message }))
+
+  // Why each product is listed
+  const why = new Map()
+  const add = (pid, reason) => { if (pid == null) return; const a = why.get(pid) || []; if (!a.includes(reason)) a.push(reason); why.set(pid, a) }
+  add(e.idProduct, 'mapped')
+  for (const [k, pid] of Object.entries(variants || {})) add(pid, 'variant ' + k)
+  for (const v of tcg.variants_detailed || []) add(v.thirdParty?.cardmarket, 'TCGdex link')
+  add(tcg.thirdParty?.cardmarket, 'TCGdex link')
+  const mine = D.products.get(e.idProduct)
+  for (const p of D.byMeta.get(e.idMetacard ?? mine?.meta) || []) add(p.id, 'same metacard')
+  if (mine) for (const p of D.byExp.get(mine.file) || []) if (p.name === mine.name) add(p.id, 'same name in set')
+  const order = [...why.keys()].sort((a, b) => (a === e.idProduct ? -1 : b === e.idProduct ? 1 : a - b))
+
+  const blocks = await Promise.all(order.map((pid) => productBlock(D, pid, { reasons: why.get(pid), mapped: pid === e.idProduct, file: pid === e.idProduct ? e.file : undefined })))
+
+  return `
+  <h2>${esc(id)} ${tcg.name ? '· ' + esc(tcg.name) : ''}</h2>
+  <div class="box">
+    <h3>Mapping <span class="id">mapping/cards.json</span></h3>
+    <div class="wrap"><table>
+      <tr><th>idProduct</th><td><a href="#p${e.idProduct}">${esc(e.idProduct)}</a></td></tr>
+      <tr><th>file</th><td><a href="#${esc(e.file)}">${esc(e.file)}</a> ${setsChip(D, e.file)}</td></tr>
+      <tr><th>idMetacard</th><td>${esc(e.idMetacard ?? '—')}</td></tr>
+      <tr><th>how</th><td class="wrap"><b>${esc(e.how ?? '—')}</b> <span class="muted">${esc(HOW[e.how] || '')}</span></td></tr>
+    </table></div>
+    ${variants ? `<h3 style="margin-top:12px">Printings with their own product <span class="id">variants</span></h3>
+      <div class="wrap"><table><tr><th>key</th><th>idProduct</th><th>name</th></tr>
+      ${Object.entries(variants).map(([k, pid]) => `<tr><td><code>${esc(k)}</code></td><td><a href="#p${pid}">${pid}</a></td><td>${esc(D.products.get(pid)?.name ?? '?')}</td></tr>`).join('')}
+      </table></div>`
+      : '<p class="muted">No <code>variants</code> entry: every printing of this card (1st Edition, unlimited, …) uses the one product above.</p>'}
+  </div>
+  ${tcgBox(tcg, e.idProduct)}
+  <h2>Cardmarket products (${order.length})</h2>
+  <p class="muted">Each product’s latest prices: the plain fields and the <code>-holo</code> fields (reverse holo / foil offers). The price guide is not split by edition, language or condition.</p>
+  ${blocks.join('')}
+  <details><summary>Raw mapping entry</summary><pre>${esc(JSON.stringify({ [id]: entry, variants: variants ?? null }, null, 1))}</pre></details>`
+}
+
+function tcgBox(tcg, mapped) {
+  if (tcg.skipped) return `<div class="box"><h3>TCGdex</h3><p class="muted">A card from mapping/overrides.json <code>custom</code>; TCGdex doesn’t have it.</p></div>`
+  if (tcg.error) return `<div class="box"><h3>TCGdex</h3><p class="muted">Couldn’t fetch it (${esc(tcg.error)}).</p></div>`
+  const flags = Object.entries(tcg.variants || {}).map(([k, v]) => `<span class="${v ? 'ok' : ''}">${esc(k)}${v ? '' : ' ✗'}</span>`).join('')
+  const rows = (tcg.variants_detailed || []).map((v) => {
+    const pid = v.thirdParty?.cardmarket
+    return `<tr><td>${esc(v.type)}</td><td>${esc([v.subtype, ...(v.stamp || [])].filter(Boolean).join(', ') || '—')}</td><td>${esc(v.foil || '')}</td><td>${esc(v.size || '')}</td>
+      <td>${pid ? `<a href="#p${pid}">${pid}</a>${pid === mapped ? '' : ' <span class="chips"><span class="warn">differs from mapping</span></span>'}` : '—'}</td></tr>`
+  }).join('')
+  return `<div class="box"><h3>TCGdex <span class="id">api.tcgdex.net/v2/en/cards/${esc(tcg.id)}</span></h3>
+    <div class="tcg">${tcg.image ? `<img src="${esc(tcg.image)}/low.webp" alt="" loading="lazy">` : ''}<div>
+      <p>${esc(tcg.name)} · ${esc(tcg.set?.name)} #${esc(tcg.localId)} · ${esc(tcg.rarity || '')}</p>
+      <div class="chips">${flags}</div>
+      ${rows ? `<div class="wrap"><table><tr><th>type</th><th>subtype / stamps</th><th>foil</th><th>size</th><th>Cardmarket</th></tr>${rows}</table></div>` : ''}
+    </div></div></div>`
+}
+
+const setsChip = (D, file) => {
+  const sets = D.setsOfExp.get(file)
+  return sets ? `<span class="muted">· ${sets.map(esc).join(', ')}</span>` : ''
+}
+
+/* One Cardmarket product: catalogue row, latest prices, history chart and table, raw rows. */
+async function productBlock(D, pid, { reasons = [], mapped = false, file } = {}) {
+  const p = D.products.get(pid)
+  file ??= p?.file ?? bucketOf(pid, null)
+  const [latest, hist] = await Promise.all([latestOf(pid, file), historyOf(D, pid, file)])
+  const by = D.mappedBy.get(pid) || []
+  const chips = [
+    ...reasons.map((r) => `<span class="${r === 'mapped' ? 'hi' : r === 'TCGdex link' ? 'warn' : ''}">${esc(r)}</span>`),
+    `<a href="#${esc(file)}">${esc(file)}${D.setsOfExp.get(file) ? ' · ' + esc(D.setsOfExp.get(file).join(', ')) : ''}</a>`,
+    p?.added && !p.added.startsWith('0000') ? `<span>added ${esc(p.added.slice(0, 10))}</span>` : '',
+    ...(by.length ? by.map((b) => `<a class="ok" href="#${esc(b.card)}">${esc(b.card)}${b.key ? ' · ' + esc(b.key) : ''}</a>`) : ['<span class="bad">no card mapped to it</span>']),
+  ].join('')
+  const lv = latest.values
+  const priceTable = lv
+    ? `<div class="wrap"><table>
+        <tr><th></th>${PLAIN.map((k) => `<th class="n">${k}</th>`).join('')}</tr>
+        <tr><th>plain</th>${PLAIN.map((k) => `<td class="n">${num(lv[k])}</td>`).join('')}</tr>
+        <tr><th>-holo</th>${PLAIN.map((k) => `<td class="n">${num(lv[k + '-holo'])}</td>`).join('')}</tr>
+      </table></div>`
+    : `<p class="muted">Not in the latest price guide${latest.day ? ' (' + esc(latest.day) + ')' : ''}.</p>`
+  return `<div class="box${mapped ? ' mapped' : ''}">
+    <div class="head"><h3><a href="#p${pid}">${pid}</a> ${esc(p?.name ?? '(not in the catalogue)')}</h3>
+      <span class="muted">${esc(p?.cat ?? '')}${p?.meta ? ' · metacard ' + esc(p.meta) : ''}</span>
+      <a href="${cmLink(pid)}" target="_blank" rel="noopener">Cardmarket ↗</a></div>
+    <div class="chips" style="margin-top:6px">${chips}</div>
+    ${priceTable}
+    ${historyPart(hist)}
+    <details><summary>Raw JSON</summary><pre>${esc(JSON.stringify({
+      catalogue: p ? Object.fromEntries(D.catFields.map((k, i) => [k, p.row[i]])) : null,
+      [`latest/${file}.json`]: latest.row ? { day: latest.day, values: latest.values, row: latest.row } : null,
+      history: hist.raw,
+    }, null, 1))}</pre></details>
+  </div>`
+}
+
+function historyPart({ points }) {
+  if (!points.length) return '<p class="muted">No history stored.</p>'
+  const cols = ['low', 'trend', 'avg', 'avg1', 'avg7', 'avg30', 'low-holo', 'trend-holo', 'avg-holo', 'avg1-holo', 'avg7-holo', 'avg30-holo']
+  const weekly = points.some((p) => p.period === 'week')
+  if (weekly) cols.push('trend-min', 'trend-max')
+  const rows = points.slice().reverse().map((p) => `<tr><td>${esc(p.day)}${p.period === 'week' ? ' <span class="muted">week</span>' : ''}</td>${
+    p.empty ? `<td colspan="${cols.length}" class="muted">left the price guide</td>` : cols.map((k) => `<td class="n">${num(p.values[k])}</td>`).join('')}</tr>`).join('')
+  return `${chart(points)}
+    <details><summary>History: ${points.length} point${points.length === 1 ? '' : 's'} (stored only when a price changes; a value holds until the next point)</summary>
+    <div class="wrap"><table><tr><th>day</th>${cols.map((k) => `<th class="n">${k}</th>`).join('')}</tr>${rows}</table></div></details>`
+}
+
+/* trend and trend-holo as step lines (change-only points hold until the next one) up to the last price day. */
+function chart(points) {
+  const last = lastDay
+  const t = (d) => Date.parse(d + 'T00:00:00Z')
+  const series = [['trend', 'var(--c1)'], ['trend-holo', 'var(--c2)']]
+  const vals = points.flatMap((p) => series.map(([k]) => p.values[k])).filter((v) => v != null)
+  if (!vals.length) return ''
+  const x0 = t(points[0].day), x1 = Math.max(t(last), t(points[points.length - 1].day) + 86400000)
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.08 || hi * 0.1 || 1
+  const y0 = Math.max(0, lo - pad), y1 = hi + pad
+  const W = 640, H = 160, L = 56, R = 8, T = 8, B = 20
+  const X = (d) => L + ((t(d) - x0) / (x1 - x0)) * (W - L - R)
+  const XL = (ms) => L + ((ms - x0) / (x1 - x0)) * (W - L - R)
+  const Y = (v) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B)
+  const paths = series.map(([k, color]) => {
+    let d = '', prev = null
+    points.forEach((p, i) => {
+      const v = p.empty ? null : p.values[k]
+      const xEnd = i + 1 < points.length ? X(points[i + 1].day) : XL(x1)
+      if (v == null) { prev = null; return }
+      d += prev == null ? `M${X(p.day).toFixed(1)},${Y(v).toFixed(1)}` : `V${Y(v).toFixed(1)}`
+      d += `H${xEnd.toFixed(1)}`
+      prev = v
+    })
+    const dots = points.filter((p) => !p.empty && p.values[k] != null)
+      .map((p) => `<circle cx="${X(p.day).toFixed(1)}" cy="${Y(p.values[k]).toFixed(1)}" r="2.5" fill="${color}"><title>${esc(p.day)} ${k}: ${esc(money.format(p.values[k]))}</title></circle>`).join('')
+    return d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>${dots}` : ''
+  }).join('')
+  const ticks = [y0, (y0 + y1) / 2, y1].map((v) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${L - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(money.format(v).replace(/,\d+$/, ''))}</text>`).join('')
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="trend and trend-holo over time">${ticks}
+    <text x="${L}" y="${H - 4}">${esc(points[0].day)}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">${esc(last)}</text>${paths}</svg>
+    <div class="legend"><span><i style="background:var(--c1)"></i>trend</span><span><i style="background:var(--c2)"></i>trend-holo</span></div>`
+}
+
+/* A product id: that product first, then the others with the same metacard. */
+async function productView(D, pid) {
+  const p = D.products.get(pid)
+  const others = p?.meta ? (D.byMeta.get(p.meta) || []).filter((o) => o.id !== pid) : []
+  const blocks = await Promise.all([productBlock(D, pid, { mapped: true }), ...others.map((o) => productBlock(D, o.id, { reasons: ['same metacard'] }))])
+  return `<h2>Product ${pid}</h2>${blocks.join('')}`
+}
+
+/* A whole price file: every catalogue product in it, in Cardmarket's creation order. */
+async function fileView(D, file) {
+  const [latest] = await Promise.all([get(`latest/${file}.json`, true)])
+  const prods = (D.byExp.get(file) || []).slice()
+  // products the price guide has in this file but the catalogue doesn't
+  for (const id of Object.keys(latest?.p || {})) if (!D.products.has(+id)) prods.push({ id: +id, name: '(not in the catalogue)', file })
+  prods.sort((a, b) => a.id - b.id)
+  const at = (row, k) => { const i = latest?.fields.indexOf(k); return row && i >= 0 ? row[i] ?? null : null }
+  const rows = prods.map((p) => {
+    const row = latest?.p[p.id]
+    const by = D.mappedBy.get(p.id) || []
+    return `<tr><td><a href="#p${p.id}">${p.id}</a></td><td class="wrap">${esc(p.name)} <span class="muted">${esc(p.cat && p.cat !== 'Pokémon Single' ? '· ' + p.cat : '')}</span></td>
+      <td class="wrap">${by.map((b) => `<a href="#${esc(b.card)}">${esc(b.card)}</a>${b.key ? ' <span class="muted">' + esc(b.key) + '</span>' : ''}`).join(', ') || '<span class="null">—</span>'}</td>
+      <td class="n">${num(at(row, 'low'))}</td><td class="n">${num(at(row, 'trend'))}</td><td class="n">${num(at(row, 'trend-holo'))}</td></tr>`
+  }).join('')
+  return `<h2>${esc(file)} ${setsChip(D, file)}</h2>
+    <p class="muted">${prods.length} products, sorted by product id (the order Cardmarket created them in, which is how the mapping lines cards up). Prices of ${esc(latest?.day ?? '—')}.</p>
+    <div class="box"><div class="wrap"><table><tr><th>idProduct</th><th>name</th><th>mapped by</th><th class="n">low</th><th class="n">trend</th><th class="n">trend-holo</th></tr>${rows}</table></div></div>`
+}
+
+/* Free text: card codes and catalogue names that contain it. */
+function searchView(D, q) {
+  const s = q.toLowerCase()
+  const cards = Object.keys(D.map.cards).filter((id) => id.toLowerCase().includes(s))
+  const prods = [...D.products.values()].filter((p) => p.name.toLowerCase().includes(s))
+  const more = (n) => (n > LIMIT ? `<p class="muted">Showing ${LIMIT} of ${n}. Type more to narrow it down.</p>` : '')
+  return `<h2>“${esc(q)}”</h2>
+    ${cards.length ? `<div class="box"><h3>Card codes (${cards.length})</h3><div class="chips" style="margin-top:6px">${cards.slice(0, LIMIT).map((id) => `<a href="#${esc(id)}">${esc(id)}</a>`).join('')}</div>${more(cards.length)}</div>` : ''}
+    <div class="box"><h3>Cardmarket products (${prods.length})</h3>
+    ${prods.length ? `<div class="wrap"><table><tr><th>idProduct</th><th>name</th><th>file</th><th>mapped by</th></tr>
+      ${prods.slice(0, LIMIT).map((p) => `<tr><td><a href="#p${p.id}">${p.id}</a></td><td class="wrap">${esc(p.name)}</td><td><a href="#${esc(p.file)}">${esc(p.file)}</a> ${setsChip(D, p.file)}</td>
+        <td class="wrap">${(D.mappedBy.get(p.id) || []).map((b) => `<a href="#${esc(b.card)}">${esc(b.card)}</a>${b.key ? ' <span class="muted">' + esc(b.key) + '</span>' : ''}`).join(', ') || '<span class="null">—</span>'}</td></tr>`).join('')}
+      </table></div>${more(prods.length)}` : '<p class="muted">No product names contain that.</p>'}</div>`
+}
+
+load().catch((e) => status(`<span class="err">Couldn’t load the price data: ${esc(e.message)}</span>`))
+route()
+</script>
+</body>
+</html>

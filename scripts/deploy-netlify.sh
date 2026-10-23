@@ -11,5 +11,7 @@ set -euo pipefail
 site="${RUNNER_TEMP:-$(mktemp -d)}/site"
 rm -rf "$site" && mkdir -p "$site"
 rsync -a --exclude '.git' --exclude 'archive/' --exclude '.cache/' --exclude 'mapping-report.html' data/ "$site/"
+# The pages in site/ (the inspector) go out with the data; they are code, so they live on main, not on the data branch.
+cp site/*.html "$site/"
 
 npx --yes netlify-cli@27.11.2 deploy --prod --no-build --dir "$site" --message "${1:-Price data}"
