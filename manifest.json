@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "days": [
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-17",
+    "2026-10-18",
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-24"
+  ],
+  "catalog": {
+    "singlesEtag": "\"9ef7ced331a0e6c4d68f9b8ead2e6837\"",
+    "nonsinglesEtag": "\"5de29cec62f15326481f7be75cbb8a66\"",
+    "count": 80027,
+    "updatedAt": "2026-10-24T06:02:03.839Z"
+  },
+  "guideEtag": "\"b401ef2a671dc2474ba630ee18269095\"",
+  "sourceCreatedAt": "2026-10-24T02:45:46+0200",
+  "sourceTime": "2026-10-24T00:45:46.000Z",
+  "lastDay": "2026-10-24",
+  "months": [
+    "2026-10"
+  ],
+  "productCount": 80029,
+  "latestFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "historyFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "updatedAt": "2026-10-24T06:02:05.599Z",
+  "mappingVersion": "2026-10-24T06:02:05.556Z",
+  "mapping": {
+    "sets": 219,
+    "cards": 23873,
+    "mapped": 21198,
+    "byOrder": 19709,
+    "byName": 965,
+    "byTcgdex": 523,
+    "byOverride": 1,
+    "byCustom": 1538,
+    "changedFromTcgdex": 1296,
+    "unknownToCatalogue": 0,
+    "noSetId": 0,
+    "updatedAt": "2026-10-20T21:09:49.539Z"
+  },
+  "weeklyMonths": [],
+  "weeklyFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo",
+    "trend-min",
+    "trend-max"
+  ],
+  "historyVersion": 2,
+  "historyBytes": {
+    "history/2026-10": 19638907
+  }
+}
