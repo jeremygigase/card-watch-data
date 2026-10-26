@@ -4,6 +4,7 @@
 //
 //   node scripts/build-mapping.mjs                 # local: downloads/updates TCGdex into .cache/tcgdex
 //   node scripts/build-mapping.mjs <tcgdex path>   # use an existing checkout of tcgdex/cards-database
+//   … --no-art                                     # keep last run's card art instead of looking again (art-lib.mjs)
 //
 // Cards are matched to products by Cardmarket's catalogue order (see match-lib.mjs). TCGdex's own
 // Cardmarket links are only used for cards the catalogue can't place.
@@ -14,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { ROOT, readJson, writeJson, bucketOf } from './lib.mjs'
 import { parseCardFile, primaryProduct, matchBracket } from './mapping-lib.mjs'
 import { matchExpansion, parseCardMeta, productFitsCard } from './match-lib.mjs'
+import { findArt } from './art-lib.mjs'
 
 const CACHE = path.join(ROOT, '.cache', 'tcgdex')
 const REPORT = path.join(ROOT, 'mapping-report.html')
@@ -106,7 +108,8 @@ function chooseExpansion(set, cat, setOverrides = {}) {
 }
 
 async function main() {
-  const src = process.argv[2] || await tcgdexCheckout()
+  const args = process.argv.slice(2)
+  const src = args.find(a => !a.startsWith('--')) || await tcgdexCheckout()
   const cat = await loadCatalogue()
   const { sets, noSetId } = await loadTcgdex(src)
   const overrides = (await readJson(OVERRIDES)) || {}
@@ -151,7 +154,7 @@ async function main() {
   }
   // 4: your own decisions in mapping/overrides.json win: { "sm1-24": 294121, "base1-58": null }
   for (const [id, product] of Object.entries(overrides)) {
-    if (id.startsWith('_') || id === 'sets' || id === 'custom' || id === 'logos') continue   // "_comment" keys; "sets": chooseExpansion; "custom": step 5; "logos": passed on as is
+    if (id.startsWith('_') || id === 'sets' || id === 'custom') continue   // "_comment" keys; "sets": chooseExpansion; "custom": step 5
     if (product == null) link.delete(id)
     else link.set(id, { idProduct: Number(product), how: 'override' })
   }
@@ -198,6 +201,15 @@ async function main() {
     stats.byCustom++
   }
 
+  // 6: pictures TCGdex has but its API doesn't link (art-lib.mjs). The app uses them when TCGdex gives no image.
+  const previous = (await readJson(path.join(ROOT, 'mapping', 'cards.json'))) || {}
+  let found
+  if (args.includes('--no-art')) found = { art: previous.art ?? {}, logos: previous.logos ?? {}, stats: null }
+  else {
+    console.log('Looking for card art TCGdex doesn\'t link (takes a few minutes) …')
+    found = await findArt(previous)
+  }
+
   const version = new Date().toISOString()
   const manifest = (await readJson(path.join(ROOT, 'manifest.json'))) || { version: 1, days: [] }
   await writeJson(path.join(ROOT, 'mapping', 'cards.json'), {
@@ -209,10 +221,11 @@ async function main() {
     variants,
     sets: setsOut,
     custom: customOut,
-    logos: overrides.logos || {},
+    art: found.art,
+    logos: found.logos,
   })
   manifest.mappingVersion = version
-  manifest.mapping = { ...stats, updatedAt: version }
+  manifest.mapping = { ...stats, art: found.stats ?? manifest.mapping?.art ?? null, updatedAt: version }
   await writeJson(path.join(ROOT, 'manifest.json'), manifest, true)
 
   // Today's trend prices, only to show in the report (they never change the mapping).
@@ -232,6 +245,9 @@ async function main() {
   if (stats.byCustom) console.log(`  plus ${stats.byCustom} cards TCGdex doesn't have, from mapping/overrides.json "custom"`)
   if (stats.unknownToCatalogue) console.log(`  ${stats.unknownToCatalogue} linked products aren't in the current catalogue`)
   if (page.toCheck) console.log(`  ${page.toCheck} cards where two products fit: check them in the report`)
+  const a = found.stats
+  console.log(`Card art TCGdex doesn't link: ${Object.keys(found.art).length} cards, ${Object.keys(found.logos).length} set logos` +
+    (a ? ` (${a.found} new, ${a.kept} kept; ${a.requests} image requests in ${a.seconds} s${a.unclear ? `, ${a.unclear} unanswered` : ''})` : ' (kept from the last run: --no-art)'))
   console.log(`Wrote mapping/cards.json. Review: open mapping-report.html`)
 }
 

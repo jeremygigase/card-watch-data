@@ -115,8 +115,10 @@ scripts/history-lib.mjs    history format: recordDay() (change-only points, all 
 scripts/rebuild-history.mjs  npm run rebuild-history -- <dir of archive .json.gz>: rebuilds history/ from the release archive
 scripts/mapping-lib.mjs    parses TCGdex card .ts files; rebucketMapping()
 scripts/match-lib.mjs      matches TCGdex cards to Cardmarket products by catalogue order + name/attacks
+scripts/art-lib.mjs        findArt(): pictures and set logos TCGdex's image server has but its API doesn't link (all 4 app languages)
 scripts/build-mapping.mjs  weekly job and local tool (npm run mapping): writes mapping/cards.json and mapping-report.html;
-                           without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json
+                           without an argument it clones/updates TCGdex into .cache/tcgdex; applies mapping/overrides.json;
+                           --no-art keeps last run's art/logos instead of running findArt()
 scripts/commit-data.sh     commits the data as ONE orphan commit + force push (keeps the repo small); refuses any branch but `data`
 .github/workflows/prices.yml   cron 01:30 + 07:30 UTC; also uploads archive/*.json.gz to release archive-YYYY-MM;
                                manual input "rebuild" downloads all archive releases and runs rebuild-history
@@ -142,9 +144,9 @@ Locally: `git worktree add data data` (ignored on main), then `npm run prices` /
   - A point without values (`[day]`) means the product left the price guide.
   - Older month files (`fields: [trend, trend-holo]`) are converted by `upgradeMonth()`.
 - **`weekly/<YYYY-MM>/<file>.json`:** months older than 90 days (`manifest.weeklyMonths`), rolled up into 4 weeks per month (days 1–7, 8–14, 15–21, 22–end): `{fields: [12 means, trend-min, trend-max], p: {idProduct: [[weekStartDay, ...values], …]}}`, also change-only (hold until the next point); a recorded week without prices is an empty point. The daily folder is deleted afterwards; the release archive keeps the originals.
-- **`mapping/cards.json`:** `{version, catalogVersion, fields: [idProduct, file, idMetacard, how], cards: {"base5-22": [274075, "e1528", 211936, "order"]}, variants: {cardId: {"holo+1st-edition": id}}, sets: {"neo1": 1531}, custom: {…}, logos: {"2022swsh": "https://images.pokemontcg.io/mcd22/logo.png"}}`
+- **`mapping/cards.json`:** `{version, catalogVersion, fields: [idProduct, file, idMetacard, how], cards: {"base5-22": [274075, "e1528", 211936, "order"]}, variants: {cardId: {"holo+1st-edition": id}}, sets: {"neo1": 1531}, custom: {…}, art: {"sm3.5-40": "https://assets.tcgdex.net/en/sm/sm35/40", "ja:S8b-1": …}, logos: {"sm3.5": "https://assets.tcgdex.net/en/sm/sm35/logo"}}`
+  - `art`/`logos` (`scripts/art-lib.mjs`): pictures TCGdex's image server has but its API gives no `image`/`logo` for, in TCGdex's own form (no size, no extension); keys are the app's codes (`ja:` etc. in front for other languages). Shining Legends and Dragon Majesty are in dot-less folders (`sm35`, `sm75`); recent promos and some ja/zh sets are at the normal address. The server can't list folders and takes ~0.6 s per answer, so per set 6 cards are checked first (HEAD `low.webp`, 8 requests at a time), the whole set only on a hit or when an earlier run found pictures there; earlier finds are kept unchecked while TCGdex still has no link. Logos need both `logo.png` and `logo.webp`. A language TCGdex can't answer for keeps its previous entries. `manifest.mapping.art` holds the run's stats.
   - `how`: `order` (lined up with the expansion's products by card number vs product id, name + attacks must fit), `name` (only fitting left-over product), `tcgdex` (TCGdex's own link), `override` (from `mapping/overrides.json`).
-  - `mapping/overrides.json` `logos: {tcgdexSetId: imageUrl}` gives sets TCGdex has no logo for one (McDonald's Collections 2011–2022, from pokemontcg.io); it is copied as is into `cards.json` `logos`, and the app uses it as `SetInfo.logo` (`setLogoOverrides` in `lib/tcgdex.ts`).
   - `mapping/overrides.json` `sets: {tcgdexSetId: idExpansion}` places sets TCGdex gives no Cardmarket link (np → 1608, bwp → 1611, sma → 2514 with Hidden Fates, tk-xy-* → 1631/1632/1683/1707).
   - Why: TCGdex gives holo and non-holo printings of old cards the same Cardmarket id; Cardmarket has one product per printing, created in card-number order.
 - **`catalog/products.json`:** `{fields: [idProduct, name, idExpansion, idCategory, categoryName, idMetacard, dateAdded], rows}`

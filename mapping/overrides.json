@@ -14,19 +14,6 @@
     "tk-xy-p": 1707,
     "tk-xy-su": 1707
   },
-  "_logos": "\"logos\": TCGdex set id -> logo image URL, for sets TCGdex has no logo for (passed on in mapping/cards.json; the app uses them on set tiles and pickers). McDonald's 2023 and 2024 have none anywhere yet.",
-  "logos": {
-    "2011bw": "https://images.pokemontcg.io/mcd11/logo.png",
-    "2012bw": "https://images.pokemontcg.io/mcd12/logo.png",
-    "2014xy": "https://images.pokemontcg.io/mcd14/logo.png",
-    "2015xy": "https://images.pokemontcg.io/mcd15/logo.png",
-    "2016xy": "https://images.pokemontcg.io/mcd16/logo.png",
-    "2017sm": "https://images.pokemontcg.io/mcd17/logo.png",
-    "2018sm": "https://images.pokemontcg.io/mcd18/logo.png",
-    "2019sm": "https://images.pokemontcg.io/mcd19/logo.png",
-    "2021swsh": "https://images.pokemontcg.io/mcd21/logo.png",
-    "2022swsh": "https://images.pokemontcg.io/mcd22/logo.png"
-  },
   "miscp-001": 275577,
   "_custom": "\"custom\": cards TCGdex doesn't have, such as Japan's Premium File promos. Each set becomes card codes <lang>:<set>-<n> (ja:pf2-3) linked to the given Cardmarket idProduct (null: the card is listed, but Cardmarket has no product for it, so it has no price). \"variant\": \"reverse\" = Cardmarket keeps its price in the -holo fields. A set with \"expansion\" (a Cardmarket idExpansion) instead of \"cards\" gets one card per product name in that expansion, numbered in product order (the World Championship decks).",
   "custom": {

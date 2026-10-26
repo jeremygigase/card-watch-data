@@ -15,7 +15,7 @@ permissions:
 jobs:
   mapping:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: data   # the scripts read and write the data in the current folder
