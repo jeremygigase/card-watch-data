@@ -247,7 +247,7 @@ async function main() {
   if (page.toCheck) console.log(`  ${page.toCheck} cards where two products fit: check them in the report`)
   const a = found.stats
   console.log(`Card art TCGdex doesn't link: ${Object.keys(found.art).length} cards, ${Object.keys(found.logos).length} set logos` +
-    (a ? ` (${a.found} new, ${a.kept} kept; ${a.requests} image requests in ${a.seconds} s${a.unclear ? `, ${a.unclear} unanswered` : ''})` : ' (kept from the last run: --no-art)'))
+    (a ? ` (${a.found} new, ${a.kept} kept; ${a.requests} image requests in ${a.seconds} s${a.unclear ? `, ${a.unclear} unanswered: ${JSON.stringify(a.unclearBy)}` : ''})` : ' (kept from the last run: --no-art)'))
   console.log(`Wrote mapping/cards.json. Review: open mapping-report.html`)
 }
 
