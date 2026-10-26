@@ -28,7 +28,8 @@ latest/e<expansion>.json      today's prices, one file per Cardmarket expansion 
 history/<YYYY-MM>/e<exp>.json all prices per product, only on days they changed (the last 90 days)
 weekly/<YYYY-MM>/e<exp>.json  older months, rolled up into weekly averages
 catalog/products.json         every Pokémon product: id, name, expansion, category
-mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name, metacard id, how it was found]
+mapping/cards.json            TCGdex card code -> [Cardmarket product id, file name, metacard id, how it was found];
+                              also "art" and "logos": pictures TCGdex has but its API doesn't link (see below)
 ```
 
 On `main`:
@@ -130,6 +131,20 @@ A number links that product; `null` removes the link (the app then has no price 
 Cardmarket link (the Nintendo, BW and Shiny Vault promos, the XY trainer kits); the matching then runs as usual.
 Commit `mapping/overrides.json` to `main` (through a pull request), then run Actions → **Weekly card mapping**
 to publish the new mapping. The weekly job runs the same script with the same overrides, so it keeps your choices.
+
+### Card art TCGdex doesn't link
+
+TCGdex's API gives no picture for about 17,000 cards (most of them Japanese and Chinese), but its image server
+has some of them anyway: Shining Legends and Dragon Majesty sit in folders without the dot (`en/sm/sm35`, not
+`sm3.5`), and recent promos and some Japanese and Chinese sets are at the normal address without a link. The
+mapping job looks for them (`scripts/art-lib.mjs`) and writes their addresses into `mapping/cards.json`:
+`"art": {"sm3.5-40": "https://assets.tcgdex.net/en/sm/sm35/40"}` and `"logos": {"sm3.5": "…/en/sm/sm35/logo"}`,
+non-English codes with their language in front (`"ja:S8b-1"`). The app uses them when TCGdex gives no picture.
+
+The image server can't list its folders and answers in about 0.6 s, so the job checks 6 cards of each set
+first and the whole set only when one is there or an earlier run found pictures in it; last week's finds are
+kept without checking them again. That takes a few minutes. Locally, `npm run mapping -- --no-art` skips it
+and keeps the previous `art` and `logos`.
 
 ## Run it on your own computer
 
