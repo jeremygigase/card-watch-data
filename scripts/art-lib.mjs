@@ -61,17 +61,29 @@ function limiter(n) {
   })
 }
 
-/* Whether the image server has a file. A timeout or server error gets one more try, then counts as "no". */
+/* Whether the image server has a file. A timeout, rate limit or server error is tried again after a pause (its
+   Retry-After, if it sends one), four tries in all; then it counts as "no", and stats.unclearBy says why.
+   Why: on GitHub's runners one quick retry left 1,478 checks unanswered, and a set whose samples all go
+   unanswered is skipped. */
+const PAUSES = [2000, 5000, 15000]
 async function exists(url, { stats, limit }) {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let why, wait = 0
+  for (let attempt = 0; attempt <= PAUSES.length; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, Math.max(wait, PAUSES[attempt - 1])))
     stats.requests++
     try {
       const res = await limit(() => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(15000) }))
       if (res.status === 200) return true
       if (res.status === 404) return false
-    } catch { /* timeout or network: once more */ }
+      why = String(res.status)
+      wait = Math.min(Number(res.headers.get('retry-after')) * 1000 || 0, 60000)
+    } catch (e) {
+      why = e.name === 'TimeoutError' ? 'timeout' : 'network'
+      wait = 0
+    }
   }
   stats.unclear++
+  stats.unclearBy[why] = (stats.unclearBy[why] ?? 0) + 1
   return false
 }
 
@@ -135,13 +147,17 @@ async function setArt(lang, set, ctx) {
  * Pictures TCGdex has but its API doesn't link: { art: {cardCode: base}, logos: {setCode: base}, stats }.
  * `previous` is the last run's { art, logos } (mapping/cards.json); its entries are kept without checking them
  * again while TCGdex still has no link of its own. If a language can't be read, its previous entries are kept.
+ * Only TCGdex addresses are kept: older mappings passed on pokemontcg.io logos under the same "logos" key.
+ * `langs` narrows the run, for trying it out.
  */
-export async function findArt(previous = {}, log = console.log) {
+export async function findArt(previous = {}, log = console.log, langs = ART_LANGS) {
   const started = Date.now()
-  const stats = { sets: 0, unlinked: 0, found: 0, kept: 0, logos: 0, requests: 0, unclear: 0, seconds: 0 }
+  const stats = { sets: 0, unlinked: 0, found: 0, kept: 0, logos: 0, requests: 0, unclear: 0, unclearBy: {}, seconds: 0 }
   const art = {}, logos = {}
+  const tcgdexOnly = (o = {}) => Object.fromEntries(Object.entries(o).filter(([, u]) => typeof u === 'string' && u.startsWith(ASSETS + '/')))
+  previous = { art: tcgdexOnly(previous.art), logos: tcgdexOnly(previous.logos) }
   const ctx = { previous, stats, limit: limiter(PARALLEL) }
-  for (const lang of ART_LANGS) {
+  for (const lang of langs) {
     const before = { ...stats }
     try {
       const list = (await apiJson(`${API}/${lang}/sets`)) ?? []
