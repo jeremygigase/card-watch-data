@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "days": [
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-17",
+    "2026-10-18",
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-24",
+    "2026-10-25",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30",
+    "2026-10-31"
+  ],
+  "catalog": {
+    "singlesEtag": "\"1cd47d8f7a69cf129dd57668ad052a18\"",
+    "nonsinglesEtag": "\"e06e26b4c0c39104e3975d4d056b5d78\"",
+    "count": 80174,
+    "updatedAt": "2026-10-31T07:08:01.868Z"
+  },
+  "guideEtag": "\"8d34aad03acb9f4d437145a02d272757\"",
+  "sourceCreatedAt": "2026-10-31T02:42:33+0100",
+  "sourceTime": "2026-10-31T01:42:33.000Z",
+  "lastDay": "2026-10-31",
+  "months": [
+    "2026-10"
+  ],
+  "productCount": 80173,
+  "latestFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "historyFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo"
+  ],
+  "updatedAt": "2026-10-31T07:08:04.594Z",
+  "mappingVersion": "2026-10-31T07:08:04.541Z",
+  "mapping": {
+    "sets": 219,
+    "cards": 23873,
+    "mapped": 21198,
+    "byOrder": 19709,
+    "byName": 965,
+    "byTcgdex": 523,
+    "byOverride": 1,
+    "byCustom": 1538,
+    "changedFromTcgdex": 1296,
+    "unknownToCatalogue": 0,
+    "noSetId": 0,
+    "art": {
+      "sets": 233,
+      "unlinked": 16815,
+      "found": 1115,
+      "kept": 2727,
+      "logos": 3,
+      "requests": 4127,
+      "unclear": 105,
+      "unclearBy": {
+        "network": 105
+      },
+      "seconds": 143
+    },
+    "updatedAt": "2026-10-26T22:25:35.251Z"
+  },
+  "weeklyMonths": [],
+  "weeklyFields": [
+    "low",
+    "trend",
+    "avg",
+    "avg1",
+    "avg7",
+    "avg30",
+    "low-holo",
+    "trend-holo",
+    "avg-holo",
+    "avg1-holo",
+    "avg7-holo",
+    "avg30-holo",
+    "trend-min",
+    "trend-max"
+  ],
+  "historyVersion": 2,
+  "historyBytes": {
+    "history/2026-10": 29441745
+  }
+}

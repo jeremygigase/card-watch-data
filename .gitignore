@@ -1,0 +1,6 @@
+# Written by the jobs but not published
+archive/
+.cache/
+mapping-report.html
+node_modules/
+.DS_Store
